@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header, Query, Request
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
@@ -182,3 +182,70 @@ def get_lead(lead_id: str, principal: Annotated[Principal, require(Action.VIEW)]
     _visible_run(db, lead.run_id, principal)
     detail = _lead_out(lead, state, LeadDetail)
     return LeadDetail.model_validate(detail)
+
+
+@router.get("/eval")
+def hero_eval(principal: Annotated[Principal, require(Action.VIEW)]) -> dict[str, Any]:
+    """Measured accuracy of the origin and clustering stages on the synthetic world with hidden ground truth."""
+    from sutradhar_api.demo_seed import HERO_EVAL
+
+    return HERO_EVAL
+
+
+@router.get("/leads/{lead_id}/evidence")
+def lead_evidence(
+    lead_id: str, request: Request, principal: Annotated[Principal, require(Action.VIEW)], db: ReadDB
+) -> dict[str, Any]:
+    """The transactions behind an IP-to-wallet lead: candidate origin IPs with posteriors, and the first sensor
+    arrivals, which drive the replay in the console."""
+    import duckdb
+
+    lead = db.get(Lead, lead_id)
+    if lead is None or lead.subject_kind != "ip_cluster":
+        raise Problem(404, "not_found", "no such lead")
+    _visible_run(db, lead.run_id, principal)
+    run = db.get(Run, lead.run_id)
+    ip, cluster_id = lead.subject_ref.split("|", 1)
+    root = request.app.state.settings.data_dir
+    con = duckdb.connect(str(root / "runs" / lead.run_id / "run.duckdb"), read_only=True)
+    try:
+        con.execute(
+            f"ATTACH '{(root / 'datasets' / run.dataset_id / 'dataset.duckdb').as_posix()}' AS ds (READ_ONLY)"
+        )
+        txs = con.execute(
+            """
+            SELECT x.txid, x.in_sats, x.first_seen_us
+            FROM ds.tx x WHERE x.txid IN (
+              SELECT i.txid FROM ds.txin i JOIN cluster c USING (address) WHERE c.cluster_id = ?
+            ) AND x.txid IN (SELECT txid FROM origin WHERE rnk = 1 AND ip = ?)
+            ORDER BY x.first_seen_us LIMIT 12
+            """,
+            [cluster_id, ip],
+        ).fetchall()
+        out = []
+        for txid, sats, first_us in txs:
+            cands = con.execute("SELECT ip, p FROM origin WHERE txid = ? ORDER BY rnk", [txid]).fetchall()
+            arrivals = con.execute(
+                "SELECT src_ip, dst_ip, ts_us FROM ds.obs WHERE txid = ? ORDER BY ts_us LIMIT 14", [txid]
+            ).fetchall()
+            out.append(
+                {
+                    "txid": txid,
+                    "sats": int(sats),
+                    "t0_us": int(first_us),
+                    "candidates": [{"ip": c[0], "p": round(float(c[1]), 4)} for c in cands],
+                    "arrivals": [
+                        {"from": a[0], "sensor": a[1], "dt_ms": round((a[2] - first_us) / 1000, 1)}
+                        for a in arrivals
+                    ],
+                }
+            )
+        wallet = [
+            r[0]
+            for r in con.execute(
+                "SELECT address FROM cluster WHERE cluster_id = ? ORDER BY 1 LIMIT 30", [cluster_id]
+            ).fetchall()
+        ]
+    finally:
+        con.close()
+    return {"ip": ip, "cluster_id": cluster_id, "addresses": wallet, "transactions": out}

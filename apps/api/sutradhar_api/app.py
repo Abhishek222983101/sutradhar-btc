@@ -107,6 +107,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not app.state.schema_current:
             log.error("database schema is not at the current revision; run `sutradhar migrate`")
         _seed_demo_admin(db, settings)
+        if settings.is_demo:
+            from sutradhar_api.demo_seed import seed_hero
+
+            seed_hero(db, settings)
         stop = threading.Event()
         thread = None
         if settings.embedded_worker:
