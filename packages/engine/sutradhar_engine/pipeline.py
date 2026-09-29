@@ -11,12 +11,18 @@ import numpy as np
 
 from sutradhar_engine.runner import Progress, RunContext, Stage, _noop, run_stages
 from sutradhar_engine.settings import EngineSettings
-from sutradhar_engine.stages import e01_load, e17_rank, e19_publish
+from sutradhar_engine.stages import e01_load, e05_cluster, e09_origin, e17_rank, e19_publish
 from sutradhar_engine.store.ddl import RUN_BASE_DDL
 from sutradhar_schemas.evidence import CapabilityProfile, RunManifest
 from sutradhar_schemas.ids import check_id
 
-DEFAULT_STAGES: tuple[Stage, ...] = (e01_load.STAGE, e17_rank.STAGE, e19_publish.STAGE)
+DEFAULT_STAGES: tuple[Stage, ...] = (
+    e01_load.STAGE,
+    e05_cluster.STAGE,
+    e09_origin.STAGE,
+    e17_rank.STAGE,
+    e19_publish.STAGE,
+)
 
 
 def _sql_path(path: Path) -> str:

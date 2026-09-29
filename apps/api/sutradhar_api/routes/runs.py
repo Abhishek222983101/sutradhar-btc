@@ -33,7 +33,7 @@ from sutradhar_engine.settings import EngineSettings
 from sutradhar_schemas.ids import new_id
 
 router = APIRouter(prefix="/api/v1", tags=["runs"])
-MODEL_VERSIONS = {"lead_ranker": "rules@0-stub"}
+MODEL_VERSIONS = {"lead_ranker": "evidence@0.1"}
 
 
 def _visible_run(db: Session, run_id: str, principal: Principal) -> Run:
