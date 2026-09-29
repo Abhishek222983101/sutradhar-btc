@@ -53,7 +53,6 @@ def _sqlite_engine(url: str, *, immediate: bool) -> Engine:
             "PRAGMA foreign_keys=ON",
             "PRAGMA busy_timeout=30000",
             "PRAGMA synchronous=NORMAL",
-            "PRAGMA trusted_schema=OFF",
         ):
             cursor.execute(pragma)
         cursor.close()

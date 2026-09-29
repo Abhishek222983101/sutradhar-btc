@@ -1,0 +1,10 @@
+.git
+.venv
+**/node_modules
+apps/web
+worlds
+data
+demo-data
+**/__pycache__
+*.duckdb
+.env*
