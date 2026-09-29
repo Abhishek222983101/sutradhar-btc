@@ -47,7 +47,7 @@ def _as_decimal(value: object) -> Decimal:
         text = value.strip()
         if not text or len(text) > MAX_AMOUNT_TEXT_LEN:
             raise AmountError("amount text is empty or too long")
-        if not _NUMBER_RE.match(text):
+        if not _NUMBER_RE.fullmatch(text):
             raise AmountError(f"not a plain decimal number: {text!r}")
         try:
             dec = Decimal(text)

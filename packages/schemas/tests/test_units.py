@@ -84,3 +84,10 @@ def test_timestamps_utc_micros() -> None:
     assert micros_to_iso(1_787_341_442_113_204) == "2026-08-21T19:44:02.113204Z"
     with pytest.raises(ValueError, match="naive"):
         utc_micros(datetime(2026, 1, 1))  # deliberately naive
+
+
+@pytest.mark.security
+def test_amount_regex_is_anchored_at_the_true_end() -> None:
+    from sutradhar_schemas.units import _NUMBER_RE
+
+    assert _NUMBER_RE.fullmatch("1.5\n") is None

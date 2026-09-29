@@ -120,7 +120,7 @@ class CanonicalRecord(BaseModel):
     @classmethod
     def _txid(cls, value: str) -> str:
         value = value.lower()
-        if not TXID_RE.match(value):
+        if not TXID_RE.fullmatch(value):
             raise ValueError("txid must be 64 hex characters")
         return value
 
@@ -133,7 +133,7 @@ class CanonicalRecord(BaseModel):
     @classmethod
     def _addresses(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         for address in value:
-            if not ADDRESS_RE.match(address):
+            if not ADDRESS_RE.fullmatch(address):
                 raise ValueError(f"implausible address: {address[:24]!r}")
         return value
 
@@ -142,7 +142,7 @@ class CanonicalRecord(BaseModel):
     def _prevouts(cls, value: tuple[str, ...] | None) -> tuple[str, ...] | None:
         if value is not None:
             for prevout in value:
-                if not PREVOUT_RE.match(prevout.lower()):
+                if not PREVOUT_RE.fullmatch(prevout.lower()):
                     raise ValueError("prevout must be 'txid:vout'")
             value = tuple(prevout.lower() for prevout in value)
         return value
@@ -152,7 +152,7 @@ class CanonicalRecord(BaseModel):
     def _country(cls, value: str | None) -> str | None:
         if value is not None:
             value = value.upper()
-            if not COUNTRY_RE.match(value):
+            if not COUNTRY_RE.fullmatch(value):
                 raise ValueError("country must be an ISO-3166 alpha-2 code")
         return value
 

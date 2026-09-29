@@ -89,3 +89,32 @@ def test_injection_shaped_addresses_rejected(hostile_address: str) -> None:
 def test_unknown_fields_forbidden() -> None:
     with pytest.raises(ValidationError, match="Extra inputs"):
         CanonicalRecord(**_record(owner="someone"))
+
+
+@pytest.mark.security
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"txid": TXID + "\n"},
+        {"output_addresses": (P2TR + "\n", P2PKH)},
+        {"geo_country_src": "IN\n"},
+        {"input_prevouts": (TXID + ":0\n",)},
+    ],
+)
+def test_surrounding_whitespace_is_stripped_never_stored(overrides: dict[str, Any]) -> None:
+    record = CanonicalRecord(**_record(**overrides)).model_dump(mode="json")
+    assert "\n" not in repr(record)
+
+
+@pytest.mark.security
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"txid": TXID[:32] + "\n" + TXID[33:]},
+        {"output_addresses": (P2TR[:20] + "\n" + P2TR[21:], P2PKH)},
+        {"geo_country_src": "I\nN"},
+    ],
+)
+def test_embedded_control_characters_are_rejected(overrides: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        CanonicalRecord(**_record(**overrides))

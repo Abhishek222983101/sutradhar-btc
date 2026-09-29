@@ -10,7 +10,7 @@ Legend: ✅ done · 🔨 in progress · ⏳ not started
 | P0.1 Repository, workspaces, tooling | ✅ | 10 passed | ruff-S ✓ bandit ✓ pip-audit ✓ gitleaks ✓ (1 reviewed FP) | uv workspace, 5 import contracts, CI |
 | P0.2 Data contract v1 and shared schemas | ✅ | 74 passed (26 security) | ruff-S ✓ bandit ✓ pip-audit ✓ gitleaks ✓ | Security tests caught 2 real input-handling gaps (huge exponents, underscore numerals) — fixed |
 | P0.3 Generator v0 ("tiny") | ✅ | 91 passed (27 security) | ruff-S ✓ bandit ✓ pip-audit ✓ gitleaks ✓ | tiny world: 217 tx, 5,425 obs in 2.7 s; byte-identical per seed; v0 IPs confined to RFC 5737 |
-| P0.4 Engine skeleton | ⏳ | | | |
+| P0.4 Engine skeleton | ✅ | 148 passed (56 security) | ruff-S ✓ bandit ✓ pip-audit ✓ gitleaks ✓ | ingest (CSV) → dataset store + X-ray; runner with stage contracts; E01/E17-stub/E19; tiny world: 0 rejects, vantage model, 5/5 sensors, identical result digests across runs. Security tests caught 3 real gaps: `$` accepting a trailing newline in validators (now `fullmatch`), user ids used as directory names (now `check_id`), `assert` in production code |
 | P0.5 API skeleton | ⏳ | | | |
 | P0.6 Web shell | ⏳ | | | |
 | P0.7 Deploy skeleton | ⏳ | | | |
@@ -54,3 +54,4 @@ Legend: ✅ done · 🔨 in progress · ⏳ not started
 |---|---|---|---|
 | 2026-09-30 | Demo API on Railway instead of Render | Railway and Vercel CLIs are logged in; fully scriptable deploy | 0006 |
 | 2026-09-30 | Landing, console and metrics in one web app (no separate Astro site) | One link for judges, identical offline, more compact | 0006 |
+| 2026-09-30 | V12 (implausible address) rejects the row instead of warning | Only 14–90 alphanumeric characters can be an address in any network; rejecting keeps markup and formula-shaped text out of the store, the UI and every export | — |

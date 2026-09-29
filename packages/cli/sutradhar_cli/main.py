@@ -22,6 +22,15 @@ def _root() -> None:
     """Sutradhar — offline Bitcoin wire + ledger intelligence (SIH26146)."""
 
 
+def _checked_id(value: str, prefix: str) -> str:
+    from sutradhar_schemas.ids import check_id
+
+    try:
+        return check_id(value, prefix)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+
 @app.command()
 def version() -> None:
     """Print the installed Sutradhar version."""
@@ -70,6 +79,58 @@ def gen_run(
     typer.echo(
         f"{scenario} (seed {seed}): {counts['txs_exported']} transactions, "
         f"{counts['observations']} observations, {counts['nodes']} nodes -> {out}"
+    )
+
+
+@app.command()
+def ingest(
+    files: Annotated[
+        list[Path],
+        typer.Argument(
+            help="Input files (CSV for now; JSON/NDJSON/XML arrive in P2).", exists=True, dir_okay=False
+        ),
+    ],
+    profile: Annotated[str, typer.Option(help="Built-in mapping profile.")] = "canonical-v1",
+    out: Annotated[Path, typer.Option(help="Datasets directory.")] = Path("data/datasets"),
+    dataset_id: Annotated[str | None, typer.Option(help="Dataset id (default: new ds_ id).")] = None,
+) -> None:
+    """Ingest files into an immutable dataset store and print its X-ray."""
+    from sutradhar_engine.ingest.builtin_profiles import BUILTIN_PROFILES
+    from sutradhar_engine.ingest.pipeline import ingest as run_ingest
+    from sutradhar_schemas.ids import new_id
+
+    if profile not in BUILTIN_PROFILES:
+        raise typer.BadParameter(f"unknown profile {profile!r}; choose from {sorted(BUILTIN_PROFILES)}")
+    ds_id = _checked_id(dataset_id, "ds") if dataset_id else new_id("ds")
+    result = run_ingest(files, BUILTIN_PROFILES[profile], out / ds_id, ds_id)
+    cap = result.capability
+    typer.echo(
+        f"{ds_id}: {cap.rows} observations, {cap.txs} transactions, {cap.addresses} addresses, {cap.ips} IPs; "
+        f"observation model {cap.network.observation_model}; rejects {cap.quality['rejects']}"
+    )
+
+
+@app.command("run")
+def run_cmd(
+    dataset: Annotated[
+        Path,
+        typer.Argument(help="Dataset directory (contains dataset.duckdb).", exists=True, file_okay=False),
+    ],
+    out: Annotated[Path, typer.Option(help="Runs directory.")] = Path("data/runs"),
+    run_id: Annotated[str | None, typer.Option(help="Run id (default: new run_ id).")] = None,
+    seed: Annotated[int, typer.Option(help="Engine seed.")] = 2026,
+    threads: Annotated[int, typer.Option(help="Worker threads (fixed per run for determinism).")] = 4,
+) -> None:
+    """Run the engine over a dataset and print the result digest."""
+    from sutradhar_engine.pipeline import run_pipeline
+    from sutradhar_engine.settings import EngineSettings
+    from sutradhar_schemas.ids import new_id
+
+    rid = _checked_id(run_id, "run") if run_id else new_id("run")
+    manifest = run_pipeline(dataset, out / rid, rid, settings=EngineSettings(seed=seed, threads=threads))
+    leads = manifest.stages.get("E17")
+    typer.echo(
+        f"{rid}: result digest {manifest.result_digest[:16]}…, leads {leads.rows.get('lead', 0) if leads else 0}"
     )
 
 
