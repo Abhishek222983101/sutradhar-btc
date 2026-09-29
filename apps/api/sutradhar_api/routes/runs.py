@@ -1,0 +1,184 @@
+"""Runs (E01 to E19 as a job) and their leads."""
+
+from __future__ import annotations
+
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, Header, Query
+from sqlalchemy import and_, or_, select
+from sqlalchemy.orm import Session
+
+from sutradhar_api import audit
+from sutradhar_api.access import can_see, scoped
+from sutradhar_api.auth.permissions import Action
+from sutradhar_api.auth.service import Principal
+from sutradhar_api.db import utcnow
+from sutradhar_api.deps import AppSettings, ReadDB, WriteDB, require
+from sutradhar_api.jobs.queue import enqueue, find_idempotent
+from sutradhar_api.models import Dataset, Job, Lead, LeadState, Run
+from sutradhar_api.pagination import Cursor, Limit, Page, cursor_time, decode_cursor, encode_cursor
+from sutradhar_api.problems import Problem
+from sutradhar_api.routes.datasets import DEMO_MAX_ACTIVE_JOBS
+from sutradhar_api.schemas import (
+    JobOut,
+    LeadDetail,
+    LeadOut,
+    LeadStateOut,
+    RunAccepted,
+    RunDetail,
+    RunIn,
+    RunOut,
+)
+from sutradhar_engine.settings import EngineSettings
+from sutradhar_schemas.ids import new_id
+
+router = APIRouter(prefix="/api/v1", tags=["runs"])
+MODEL_VERSIONS = {"lead_ranker": "rules@0-stub"}
+
+
+def _visible_run(db: Session, run_id: str, principal: Principal) -> Run:
+    run = db.get(Run, run_id)
+    if run is None or not can_see(run.created_by, principal):
+        raise Problem(404, "not_found", "no such run")
+    return run
+
+
+@router.post("/runs", status_code=202)
+def start_run(
+    body: RunIn,
+    principal: Annotated[Principal, require(Action.RUN_START)],
+    db: WriteDB,
+    settings: AppSettings,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", max_length=128)] = None,
+) -> RunAccepted:
+    existing = find_idempotent(db, principal.user.id, idempotency_key)
+    if existing is not None:
+        run = db.get(Run, existing.payload.get("run_id", "")) if existing.kind == "run" else None
+        if run is None:
+            raise Problem(
+                409, "idempotency_conflict", "this Idempotency-Key was used for a different request"
+            )
+        return RunAccepted(run=RunOut.model_validate(run), job=JobOut.model_validate(existing))
+    dataset = db.get(Dataset, body.dataset_id)
+    if dataset is None or not can_see(dataset.created_by, principal):
+        raise Problem(404, "not_found", "no such dataset")
+    if dataset.status != "normalised":
+        raise Problem(
+            409, "dataset_not_ready", f"the dataset is {dataset.status}; it must finish ingesting first"
+        )
+    if settings.is_demo:
+        active = db.scalars(
+            select(Job.id).where(Job.created_by == principal.user.id, Job.status.in_(("queued", "running")))
+        ).all()
+        if len(active) >= DEMO_MAX_ACTIVE_JOBS:
+            raise Problem(429, "busy", "wait for your current jobs to finish before starting another")
+    now = utcnow()
+    config = EngineSettings(threads=settings.engine_threads).model_dump(mode="json")
+    run = Run(
+        id=new_id("run"),
+        dataset_id=dataset.id,
+        status="queued",
+        config=config,
+        model_versions=MODEL_VERSIONS,
+        refdata_versions={},
+        created_by=principal.user.id,
+        created_at=now,
+    )
+    db.add(run)
+    db.flush()
+    job = enqueue(
+        db,
+        kind="run",
+        payload={"run_id": run.id, "dataset_id": dataset.id, "config": config},
+        created_by=principal.user.id,
+        idempotency_key=idempotency_key,
+    )
+    audit.append(
+        db,
+        actor_id=principal.user.id,
+        actor_role=principal.role,
+        action="run.start",
+        target_kind="run",
+        target_ref=run.id,
+        payload={"dataset_id": dataset.id, "normalised_digest": dataset.normalised_digest, "job_id": job.id},
+    )
+    db.commit()
+    return RunAccepted(run=RunOut.model_validate(run), job=JobOut.model_validate(job))
+
+
+@router.get("/runs")
+def list_runs(
+    principal: Annotated[Principal, require(Action.VIEW)],
+    db: ReadDB,
+    dataset_id: Annotated[str | None, Query(max_length=80)] = None,
+    limit: Limit = 50,
+    cursor: Cursor = None,
+) -> Page[RunOut]:
+    stmt = scoped(select(Run), Run.created_by, principal)
+    if dataset_id:
+        stmt = stmt.where(Run.dataset_id == dataset_id)
+    after = decode_cursor(cursor, (str, str))
+    if after is not None:
+        at = cursor_time(after[0])
+        stmt = stmt.where(or_(Run.created_at < at, and_(Run.created_at == at, Run.id < after[1])))
+    rows = list(db.scalars(stmt.order_by(Run.created_at.desc(), Run.id.desc()).limit(limit + 1)))
+    more, rows = len(rows) > limit, rows[:limit]
+    next_cursor = encode_cursor([rows[-1].created_at.isoformat(), rows[-1].id]) if more else None
+    return Page[RunOut](items=[RunOut.model_validate(r) for r in rows], next_cursor=next_cursor)
+
+
+@router.get("/runs/{run_id}")
+def get_run(run_id: str, principal: Annotated[Principal, require(Action.VIEW)], db: ReadDB) -> RunDetail:
+    return RunDetail.model_validate(_visible_run(db, run_id, principal))
+
+
+def _lead_out(lead: Lead, state: LeadState | None, model: type[LeadOut] = LeadOut) -> LeadOut:
+    out = model.model_validate(lead)
+    out.state = LeadStateOut.model_validate(state) if state is not None else None
+    return out
+
+
+@router.get("/runs/{run_id}/leads")
+def list_leads(
+    run_id: str,
+    *,
+    principal: Annotated[Principal, require(Action.VIEW)],
+    db: ReadDB,
+    type: Annotated[Literal["ACTOR", "CASHOUT", "CHAIN", "TX", "IP"] | None, Query()] = None,
+    grade: Annotated[Literal["A", "B", "C"] | None, Query()] = None,
+    limit: Limit = 50,
+    cursor: Cursor = None,
+) -> Page[LeadOut]:
+    run = _visible_run(db, run_id, principal)
+    stmt = (
+        select(Lead, LeadState)
+        .outerjoin(LeadState, LeadState.lead_key == Lead.lead_key)
+        .where(Lead.run_id == run.id)
+    )
+    if type:
+        stmt = stmt.where(Lead.type == type)
+    if grade:
+        stmt = stmt.where(Lead.grade == grade)
+    after = decode_cursor(cursor, (float, str))
+    if after is not None:
+        priority, lead_id = float(after[0]), after[1]
+        stmt = stmt.where(or_(Lead.priority < priority, and_(Lead.priority == priority, Lead.id > lead_id)))
+    rows = db.execute(stmt.order_by(Lead.priority.desc(), Lead.id).limit(limit + 1)).all()
+    more, rows = len(rows) > limit, rows[:limit]
+    next_cursor = encode_cursor([rows[-1][0].priority, rows[-1][0].id]) if more else None
+    return Page[LeadOut](items=[_lead_out(lead, state) for lead, state in rows], next_cursor=next_cursor)
+
+
+@router.get("/leads/{lead_id}")
+def get_lead(lead_id: str, principal: Annotated[Principal, require(Action.VIEW)], db: ReadDB) -> LeadDetail:
+    row = db.execute(
+        select(Lead, LeadState)
+        .outerjoin(LeadState, LeadState.lead_key == Lead.lead_key)
+        .where(Lead.id == lead_id)
+    ).first()
+    if row is None:
+        raise Problem(404, "not_found", "no such lead")
+    lead, state = row
+    _visible_run(db, lead.run_id, principal)
+    detail = _lead_out(lead, state, LeadDetail)
+    return LeadDetail.model_validate(detail)

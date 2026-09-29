@@ -134,5 +134,149 @@ def run_cmd(
     )
 
 
+api_app = typer.Typer(help="The HTTP API.", no_args_is_help=True)
+app.add_typer(api_app, name="api")
+
+
+@api_app.command("serve")
+def api_serve(
+    host: Annotated[str, typer.Option(help="Bind address.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port.")] = 8000,
+) -> None:
+    """Serve the API (settings come from environment variables, see docs)."""
+    import uvicorn
+
+    # Pure-Python loop and HTTP parser: every socket stays behind the offline guard (I1).
+    uvicorn.run(
+        "sutradhar_api.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        loop="asyncio",
+        http="h11",
+        proxy_headers=True,
+        forwarded_allow_ips="127.0.0.1",
+        server_header=False,
+        date_header=False,
+    )
+
+
+@api_app.command("openapi")
+def api_openapi(
+    out: Annotated[Path | None, typer.Option(help="Write here instead of stdout.")] = None,
+) -> None:
+    """Print the OpenAPI document (the web client is generated from it)."""
+    import json
+
+    from sutradhar_api.app import create_app
+    from sutradhar_api.config import Settings
+
+    spec = create_app(Settings(embedded_worker=False, offline_guard="warn")).openapi()
+    text = json.dumps(spec, indent=2, sort_keys=True) + "\n"
+    if out is None:
+        typer.echo(text, nl=False)
+    else:
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {out}")
+
+
+@app.command()
+def migrate() -> None:
+    """Bring the app database schema up to date (uses DATABASE_URL or MIGRATION_DATABASE_URL)."""
+    import os
+
+    from sutradhar_api import migrate as migrations
+    from sutradhar_api.config import Settings
+
+    url = os.environ.get("MIGRATION_DATABASE_URL") or Settings().database_url
+    migrations.upgrade(url)
+    typer.echo(f"schema at {migrations.current_revision(url)}")
+
+
+@app.command()
+def worker(concurrency: Annotated[int | None, typer.Option(help="Parallel jobs.")] = None) -> None:
+    """Run the job worker until interrupted."""
+    import signal
+    import threading
+
+    from sutradhar_api.config import Settings
+    from sutradhar_api.db import Database
+    from sutradhar_api.jobs.worker import Worker
+
+    settings = Settings()
+    stop = threading.Event()
+    signal.signal(signal.SIGTERM, lambda *_: stop.set())
+    signal.signal(signal.SIGINT, lambda *_: stop.set())
+    Worker(settings, Database(settings.database_url), concurrency=concurrency).run_forever(stop)
+
+
+users_app = typer.Typer(help="User accounts.", no_args_is_help=True)
+app.add_typer(users_app, name="users")
+
+
+@users_app.command("create")
+def users_create(
+    email: Annotated[str, typer.Option(help="Sign-in email.")],
+    name: Annotated[str, typer.Option(help="Display name.")],
+    role: Annotated[str, typer.Option(help="analyst | lead | admin | auditor")] = "analyst",
+) -> None:
+    """Create a user and print a generated password once (it is stored only as an argon2id hash)."""
+    import secrets
+
+    from sutradhar_api import audit
+    from sutradhar_api.auth.security import hash_password
+    from sutradhar_api.config import Settings
+    from sutradhar_api.db import Database, utcnow
+    from sutradhar_api.models import User
+    from sutradhar_schemas.ids import new_id
+
+    if role not in ("analyst", "lead", "admin", "auditor"):
+        raise typer.BadParameter("role must be analyst, lead, admin or auditor")
+    password = secrets.token_urlsafe(18)
+    db = Database(Settings().database_url)
+    with db.write() as session:
+        user = User(
+            id=new_id("usr"),
+            email=email.strip().lower(),
+            name=name.strip(),
+            role=role,
+            password_hash=hash_password(password),
+            is_active=True,
+            created_at=utcnow(),
+        )
+        session.add(user)
+        session.flush()
+        audit.append(
+            session,
+            actor_id=None,
+            actor_role="system",
+            action="user.create",
+            target_kind="user",
+            target_ref=user.id,
+            payload={"role": role, "via": "cli"},
+        )
+        session.commit()
+    typer.echo(f"created {user.id} ({role}); password (shown once): {password}")
+
+
+audit_app = typer.Typer(help="The audit chain.", no_args_is_help=True)
+app.add_typer(audit_app, name="audit")
+
+
+@audit_app.command("verify")
+def audit_verify() -> None:
+    """Recompute every audit hash; exit 1 if the chain is broken."""
+    from sutradhar_api import audit
+    from sutradhar_api.config import Settings
+    from sutradhar_api.db import Database
+
+    with Database(Settings().database_url).read() as session:
+        result = audit.verify(session)
+    if not result.ok:
+        typer.echo(f"BROKEN at entry {result.broken_at}: {result.reason}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"audit chain OK: {result.entries} entries, head {result.head[:16]}…")
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
