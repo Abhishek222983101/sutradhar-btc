@@ -8,7 +8,9 @@ and it decides which side's port a sensor sees in its logs.
 from __future__ import annotations
 
 import ipaddress
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 
@@ -39,6 +41,9 @@ class Conn:
 class Topology:
     nodes: list[Node] = field(default_factory=list)
     conns: list[Conn] = field(default_factory=list)
+    geo: dict[str, tuple[str, str]] = field(
+        default_factory=dict
+    )  # ip -> (country, asn); realistic space only
 
     @property
     def sensors(self) -> list[Node]:
@@ -63,6 +68,24 @@ def _testnet_ips(rng: np.random.Generator, count: int) -> list[str]:
     return [pool[int(i)] for i in order]
 
 
+def _realistic_ips(rng: np.random.Generator, count: int) -> tuple[list[str], dict[str, tuple[str, str]]]:
+    """Public-looking addresses drawn from per-country /24 blocks of the open GeoIP database."""
+    data = json.loads((Path(__file__).parent / "ip_pools.json").read_text(encoding="utf-8"))
+    countries = sorted(data["weights"])
+    probs = np.array([data["weights"][c] for c in countries], dtype=float)
+    probs /= probs.sum()
+    ips: list[str] = []
+    geo: dict[str, tuple[str, str]] = {}
+    while len(ips) < count:
+        cc = countries[int(rng.choice(len(countries), p=probs))]
+        block = data["pools"][cc][int(rng.integers(len(data["pools"][cc])))]
+        ip = f"{block['prefix']}.{int(rng.integers(2, 254))}"
+        if ip not in geo:
+            ips.append(ip)
+            geo[ip] = (cc, str(block["asn"]))
+    return ips, geo
+
+
 def build_topology(world: World) -> Topology:
     """Assign every agent a node, add relay listeners and sensors, and wire outbound connections."""
     cfg = world.cfg.network
@@ -72,7 +95,10 @@ def build_topology(world: World) -> Topology:
     client_agents = [a for a in world.agents.values() if a.kind not in ("exchange",)]
     n_relays = max(0, cfg.listeners - len(listener_agents))
     total = len(listener_agents) + n_relays + cfg.sensors + len(client_agents)
-    ips = _testnet_ips(rng, total)
+    if cfg.ip_space == "realistic":
+        ips, topo.geo = _realistic_ips(rng, total)
+    else:
+        ips = _testnet_ips(rng, total)
 
     def add(kind: str, agent: Agent | None) -> Node:
         node = Node(len(topo.nodes), kind, ips[len(topo.nodes)], agent.agent_id if agent else None)

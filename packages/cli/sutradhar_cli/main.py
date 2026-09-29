@@ -90,15 +90,18 @@ def ingest(
             help="Input files (CSV for now; JSON/NDJSON/XML arrive in P2).", exists=True, dir_okay=False
         ),
     ],
-    profile: Annotated[str, typer.Option(help="Built-in mapping profile.")] = "canonical-v1",
+    profile: Annotated[
+        str | None, typer.Option(help="Built-in mapping profile (default: chosen from the file extension).")
+    ] = None,
     out: Annotated[Path, typer.Option(help="Datasets directory.")] = Path("data/datasets"),
     dataset_id: Annotated[str | None, typer.Option(help="Dataset id (default: new ds_ id).")] = None,
 ) -> None:
     """Ingest files into an immutable dataset store and print its X-ray."""
-    from sutradhar_engine.ingest.builtin_profiles import BUILTIN_PROFILES
+    from sutradhar_engine.ingest.builtin_profiles import BUILTIN_PROFILES, PROFILE_BY_EXTENSION
     from sutradhar_engine.ingest.pipeline import ingest as run_ingest
     from sutradhar_schemas.ids import new_id
 
+    profile = profile or PROFILE_BY_EXTENSION.get(files[0].suffix.lower(), "canonical-v1")
     if profile not in BUILTIN_PROFILES:
         raise typer.BadParameter(f"unknown profile {profile!r}; choose from {sorted(BUILTIN_PROFILES)}")
     ds_id = _checked_id(dataset_id, "ds") if dataset_id else new_id("ds")

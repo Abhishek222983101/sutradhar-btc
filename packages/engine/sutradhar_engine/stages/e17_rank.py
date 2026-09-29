@@ -222,6 +222,9 @@ class RankStage:
                     "SELECT c.cluster_id, max(t.taint) FROM cluster c JOIN taint t USING (address) GROUP BY 1"
                 ).fetchall()
             )
+        geo: dict[str, tuple] = {}
+        if "ip_geo" in have:
+            geo = {r[0]: r[1:] for r in con.execute("SELECT ip, country, asn, org FROM ip_geo").fetchall()}
         out = []
         for ip, cluster_id, n_tx, ps, value, last_us, n_addr, first_share in pairs:
             p = 1 - math.prod(1 - min(0.999, float(q)) * WEAK_CALL for q in ps)
@@ -268,6 +271,18 @@ class RankStage:
                 },
                 *extra,
             ]
+            place = geo.get(ip)
+            if place and place[0]:
+                where = f"{place[0]}" + (f", AS{place[1]} {place[2]}" if place[1] else "")
+                reasons.append(
+                    {
+                        "family": "NET",
+                        "feature": "geoip",
+                        "value": place[0],
+                        "contribution": 0.0,
+                        "text": f"GeoIP places this IP in {where} (DB-IP Lite, 2026-09). Location context only; it does not change the score.",
+                    }
+                )
             out.append(
                 (
                     lead_key("ACTOR", "ip_cluster", subject),

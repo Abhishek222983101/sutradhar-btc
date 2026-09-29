@@ -121,6 +121,11 @@ class ScenarioConfig(_Cfg):
 
 
 PRESETS: dict[str, ScenarioConfig] = {
+    "demo": ScenarioConfig(
+        name="demo",
+        description="The tiny world with public-looking IPs from an open GeoIP database, for the live demo.",
+        network=NetworkCfg(ip_space="realistic"),
+    ),
     "tiny": ScenarioConfig(
         name="tiny", description="Seconds to generate: one of everything, for tests and CI."
     ),

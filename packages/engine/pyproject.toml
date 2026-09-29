@@ -11,6 +11,8 @@ dependencies = [
   "numpy>=2.1",
   "orjson>=3.10",
   "scikit-learn>=1.9.1",
+  "maxminddb>=3.2.0",
+  "defusedxml>=0.7.1",
 ]
 
 [build-system]

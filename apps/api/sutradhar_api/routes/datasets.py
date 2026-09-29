@@ -30,7 +30,22 @@ from sutradhar_api.schemas import DatasetAccepted, DatasetDetail, DatasetFileOut
 from sutradhar_schemas.ids import new_id
 
 router = APIRouter(prefix="/api/v1", tags=["datasets"])
-FORMATS = {".csv": "csv", ".tsv": "tsv", ".txt": "csv"}
+FORMATS = {
+    ".csv": "csv",
+    ".tsv": "tsv",
+    ".txt": "csv",
+    ".json": "json",
+    ".ndjson": "ndjson",
+    ".jsonl": "ndjson",
+    ".xml": "xml",
+}
+PROFILES = {
+    "csv": "canonical-v1",
+    "tsv": "canonical-v1",
+    "json": "canonical-json-v1",
+    "ndjson": "canonical-ndjson-v1",
+    "xml": "canonical-xml-v1",
+}
 MAX_FILES = 10
 DEMO_MAX_ACTIVE_JOBS = 2
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -63,7 +78,7 @@ async def _save(files: list[UploadFile], settings: Settings, dataset_id: str) ->
         name = safe_filename(upload.filename)
         fmt = FORMATS.get(Path(name).suffix.lower())
         if fmt is None:
-            raise Problem(415, "unsupported_format", f"{name}: upload CSV or TSV files (.csv, .tsv, .txt)")
+            raise Problem(415, "unsupported_format", f"{name}: upload CSV, TSV, JSON, NDJSON or XML files")
         file_id = new_id("file")
         path = dest / f"{file_id}__{name}"
         digest, size = hashlib.sha256(), 0
@@ -201,6 +216,13 @@ async def upload_dataset(
             existing = find_idempotent(db, principal.user.id, idempotency_key)
         if existing is not None:
             return await run_in_threadpool(_replayed, request, principal, existing.id)
+    if (
+        len(
+            {PROFILES.get(FORMATS.get(Path(safe_filename(f.filename)).suffix.lower(), ""), "") for f in files}
+        )
+        > 1
+    ):
+        raise Problem(400, "mixed_formats", "upload files of one format at a time")
     if not 1 <= len(files) <= MAX_FILES:
         raise Problem(400, "file_count", f"upload between 1 and {MAX_FILES} files")
     await run_in_threadpool(_check_capacity, request, principal)

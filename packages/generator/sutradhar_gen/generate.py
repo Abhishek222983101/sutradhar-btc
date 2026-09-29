@@ -46,7 +46,7 @@ def generate(cfg: ScenarioConfig, seed: int, out: Path) -> dict[str, Any]:
         observer.observe(i, tx.ts_us, prop, log)
 
     data_dir, truth_dir = out / "data", out / "truth"
-    rows = write_canonical_csv(data_dir / "traffic.csv", exported, log)
+    rows = write_canonical_csv(data_dir / "traffic.csv", exported, log, topo.geo)
     _write_watchlist(data_dir / "watchlist.csv", ops)
     _write_truth(truth_dir, world, topo, exchanges, exported)
 

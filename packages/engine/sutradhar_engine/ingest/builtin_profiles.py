@@ -31,4 +31,26 @@ CANONICAL_CSV = MappingProfile.model_validate(
     }
 )
 
-BUILTIN_PROFILES: dict[str, MappingProfile] = {CANONICAL_CSV.profile: CANONICAL_CSV}
+
+def _variant(name: str, fmt: str, **extra: object) -> MappingProfile:
+    return MappingProfile.model_validate(
+        {**CANONICAL_CSV.model_dump(mode="json"), "profile": name, "format": fmt, **extra}
+    )
+
+
+CANONICAL_JSON = _variant("canonical-json-v1", "json")
+CANONICAL_NDJSON = _variant("canonical-ndjson-v1", "ndjson")
+CANONICAL_XML = _variant("canonical-xml-v1", "xml", xml={"record_tag": "record"})
+
+BUILTIN_PROFILES: dict[str, MappingProfile] = {
+    p.profile: p for p in (CANONICAL_CSV, CANONICAL_JSON, CANONICAL_NDJSON, CANONICAL_XML)
+}
+PROFILE_BY_EXTENSION = {
+    ".csv": "canonical-v1",
+    ".tsv": "canonical-v1",
+    ".txt": "canonical-v1",
+    ".json": "canonical-json-v1",
+    ".ndjson": "canonical-ndjson-v1",
+    ".jsonl": "canonical-ndjson-v1",
+    ".xml": "canonical-xml-v1",
+}
