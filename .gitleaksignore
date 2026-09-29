@@ -1,0 +1,2 @@
+# False positive: example lead_key value inside a JSON sample in the blueprint (§9.3.2), not a secret.
+307e6be45344465e0538640fa9cd32263517e18f:SUTRADHAR_PLATFORM_BLUEPRINT.md:generic-api-key:2339

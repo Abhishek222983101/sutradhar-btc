@@ -35,7 +35,7 @@ security: ## Security gate: SAST + dependency audit + secret scan + security tes
 	$(PY) ruff check --select S .
 	$(PY) bandit -q -r packages apps/api -c pyproject.toml
 	$(PY) pip-audit --skip-editable --progress-spinner off
-	@if [ -d .git ] && git rev-parse HEAD >/dev/null 2>&1; then $(GITLEAKS) git /repo --redact --no-banner; else $(GITLEAKS) dir /repo --redact --no-banner --max-target-megabytes 5; fi
+	@if [ -d .git ] && git rev-parse HEAD >/dev/null 2>&1; then $(GITLEAKS) git /repo --redact --no-banner --gitleaks-ignore-path /repo/.gitleaksignore; else $(GITLEAKS) dir /repo --redact --no-banner --max-target-megabytes 5; fi
 	$(PY) pytest -q -m security
 	@if [ -d apps/web/node_modules ]; then pnpm audit --prod; fi
 
