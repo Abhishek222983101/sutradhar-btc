@@ -8,24 +8,20 @@ source is used as-is (confidence capped). This is the network half of the PS: "i
 
 from __future__ import annotations
 
+from sutradhar_engine.origin_model import FEATURE_SQL, load_model
 from sutradhar_engine.runner import RunContext, StageReport
 
 TAU_S = 0.25  # seconds; the first announcer leads its relays by roughly a relay hop
 TOP_K = 5
 
-SQL = f"""
+SCORE_SQL = """
 CREATE TABLE origin AS
-WITH heard AS (
-  SELECT txid, src_ip AS ip, min(ts_us) AS t, count(DISTINCT dst_ip) AS sensors_heard
-  FROM ds.obs WHERE src_ip IS NOT NULL GROUP BY 1, 2
-), scored AS (
-  SELECT *, exp(-((t - min(t) OVER (PARTITION BY txid)) / 1e6) / {TAU_S}) AS s FROM heard
-), norm AS (
-  SELECT *, s / sum(s) OVER (PARTITION BY txid) AS p,
-         row_number() OVER (PARTITION BY txid ORDER BY t, ip) AS rnk FROM scored
-)
-SELECT txid, ip, p, rnk::INTEGER AS rnk, sensors_heard::INTEGER AS sensors_heard,
-       (rnk = 1)::INTEGER AS sensors_first FROM norm WHERE rnk <= {TOP_K}
+WITH s AS (SELECT *, {score} AS z FROM origin_feat),
+n AS (SELECT *, exp(z - max(z) OVER (PARTITION BY txid)) AS e FROM s),
+p AS (SELECT *, e / sum(e) OVER (PARTITION BY txid) AS p,
+             row_number() OVER (PARTITION BY txid ORDER BY z DESC, t, ip) AS rnk FROM n)
+SELECT txid, ip, p, rnk::INTEGER AS rnk, sensors_heard::INTEGER AS sensors_heard, (rank = 1)::INTEGER AS sensors_first
+FROM p WHERE rnk <= {top_k}
 """
 
 
@@ -36,9 +32,17 @@ class OriginStage:
     produces = ("origin",)
 
     def run(self, ctx: RunContext) -> StageReport:
-        ctx.con.execute(SQL)
-        row = ctx.con.execute("SELECT count(DISTINCT txid) FROM origin").fetchone()
-        return StageReport(rows={"origin_txs": int(row[0]) if row else 0})
+        con = ctx.con
+        con.execute(FEATURE_SQL)
+        model = load_model()
+        score = model.logit_sql() if model else f"(-dt_s / {TAU_S})"
+        con.execute(SCORE_SQL.format(score=score, top_k=TOP_K))
+        ctx.put_meta("origin_model", model.version if model else "timing-formula")
+        row = con.execute("SELECT count(DISTINCT txid) FROM origin").fetchone()
+        return StageReport(
+            rows={"origin_txs": int(row[0]) if row else 0},
+            notes=[f"model {model.version}" if model else "no trained weights found: timing formula used"],
+        )
 
 
 STAGE = OriginStage()
