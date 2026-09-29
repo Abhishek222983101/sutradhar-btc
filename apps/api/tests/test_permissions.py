@@ -121,7 +121,7 @@ def test_demo_visitors_cannot_see_each_other(demo_client: TestClient, tiny_csv: 
     assert demo_client.get(f"/api/v1/datasets/{dataset_id}", headers=alice).status_code == 200
     assert demo_client.get(f"/api/v1/datasets/{dataset_id}", headers=bob).status_code == 404
     assert demo_client.get(f"/api/v1/jobs/{job_id}", headers=bob).status_code == 404
-    assert demo_client.get("/api/v1/datasets", headers=bob).json()["items"] == []
+    assert [d["id"] for d in demo_client.get("/api/v1/datasets", headers=bob).json()["items"]] == ["ds_hero"]
     assert demo_client.post(f"/api/v1/jobs/{job_id}/cancel", headers=bob).status_code == 404
 
 

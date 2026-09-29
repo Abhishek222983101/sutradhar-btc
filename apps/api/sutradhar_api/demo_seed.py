@@ -55,6 +55,7 @@ def seed_hero(db: Database, settings: Settings) -> None:
         data / "datasets" / HERO_DATASET,
         HERO_DATASET,
     )
+    shutil.copy(HERO.with_name("hero_watchlist.csv"), data / "datasets" / HERO_DATASET / "watchlist.csv")
     manifest = run_pipeline(
         data / "datasets" / HERO_DATASET,
         data / "runs" / HERO_RUN,

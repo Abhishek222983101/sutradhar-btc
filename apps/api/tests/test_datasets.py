@@ -20,7 +20,7 @@ def analyst(client: TestClient) -> dict[str, str]:
 
 def _uploads(client: TestClient) -> list[Path]:
     root = client.app.state.settings.data_dir / "uploads"
-    return [p for p in root.rglob("*") if p.is_file()] if root.exists() else []
+    return [p for p in root.rglob("*") if p.is_file() and "ds_hero" not in p.parts] if root.exists() else []
 
 
 def test_upload_creates_dataset_job_and_audit_entry(
@@ -108,7 +108,7 @@ def test_demo_upload_cap_is_enforced_while_streaming(demo_client: TestClient) ->
     assert response.headers["content-type"].startswith("application/problem+json")
     assert _uploads(demo_client) == []
     with demo_client.app.state.db.read() as session:
-        assert session.scalar(select(func.count()).select_from(Dataset)) == 0
+        assert session.scalar(select(func.count()).select_from(Dataset)) == 1  # only the hero world
 
 
 @pytest.mark.security

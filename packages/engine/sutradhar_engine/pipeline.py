@@ -11,7 +11,16 @@ import numpy as np
 
 from sutradhar_engine.runner import Progress, RunContext, Stage, _noop, run_stages
 from sutradhar_engine.settings import EngineSettings
-from sutradhar_engine.stages import e01_load, e05_cluster, e09_origin, e17_rank, e19_publish
+from sutradhar_engine.stages import (
+    e01_load,
+    e05_cluster,
+    e07_peel,
+    e08_anomaly,
+    e09_origin,
+    e13_taint,
+    e17_rank,
+    e19_publish,
+)
 from sutradhar_engine.store.ddl import RUN_BASE_DDL
 from sutradhar_schemas.evidence import CapabilityProfile, RunManifest
 from sutradhar_schemas.ids import check_id
@@ -19,7 +28,10 @@ from sutradhar_schemas.ids import check_id
 DEFAULT_STAGES: tuple[Stage, ...] = (
     e01_load.STAGE,
     e05_cluster.STAGE,
+    e07_peel.STAGE,
+    e08_anomaly.STAGE,
     e09_origin.STAGE,
+    e13_taint.STAGE,
     e17_rank.STAGE,
     e19_publish.STAGE,
 )
