@@ -1,0 +1,17 @@
+[project]
+name = "sutradhar-evals"
+version = "0.1.0"
+description = "Sutradhar evaluation harness: ground truth, metrics, training, reports."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "sutradhar-schemas",
+  "sutradhar-engine",
+  "sutradhar-gen",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sutradhar_evals"]

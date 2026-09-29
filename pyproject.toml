@@ -1,0 +1,55 @@
+[project]
+name = "sutradhar-workspace"
+version = "0.1.0"
+description = "Sutradhar monorepo root (SIH26146 · NTRO) — installs every workspace member for development."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "sutradhar-schemas",
+  "sutradhar-engine",
+  "sutradhar-gen",
+  "sutradhar-evals",
+  "sutradhar-cli",
+  "sutradhar-api",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "hypothesis>=6.120",
+  "ruff>=0.9",
+  "import-linter>=2.1",
+  "bandit[toml]>=1.8",
+  "pip-audit>=2.7",
+  "httpx>=0.28",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/api", "packages/*"]
+
+[tool.uv.sources]
+sutradhar-schemas = { workspace = true }
+sutradhar-engine = { workspace = true }
+sutradhar-gen = { workspace = true }
+sutradhar-evals = { workspace = true }
+sutradhar-cli = { workspace = true }
+sutradhar-api = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "packages", "apps/api"]
+addopts = "-ra --strict-markers"
+markers = [
+  "security: security-focused tests (run by `make security`)",
+  "slow: long-running tests (excluded from the fast CI loop)",
+]
+filterwarnings = ["error::DeprecationWarning:sutradhar_.*"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "node_modules"]
+
+[tool.coverage.run]
+source = ["packages", "apps/api"]
+omit = ["*/tests/*"]

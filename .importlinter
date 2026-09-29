@@ -1,0 +1,60 @@
+[importlinter]
+root_packages =
+    sutradhar_schemas
+    sutradhar_engine
+    sutradhar_gen
+    sutradhar_evals
+    sutradhar_cli
+    sutradhar_api
+include_external_packages = False
+
+[importlinter:contract:schemas-is-the-base]
+name = Schemas import nothing internal (I18)
+type = forbidden
+source_modules =
+    sutradhar_schemas
+forbidden_modules =
+    sutradhar_engine
+    sutradhar_gen
+    sutradhar_evals
+    sutradhar_api
+    sutradhar_cli
+
+[importlinter:contract:engine-never-sees-truth]
+name = Engine never imports the generator, evals, API or CLI (I7, I18)
+type = forbidden
+source_modules =
+    sutradhar_engine
+forbidden_modules =
+    sutradhar_gen
+    sutradhar_evals
+    sutradhar_api
+    sutradhar_cli
+
+[importlinter:contract:generator-is-blind]
+name = Generator never imports the engine, evals, API or CLI (I18)
+type = forbidden
+source_modules =
+    sutradhar_gen
+forbidden_modules =
+    sutradhar_engine
+    sutradhar_evals
+    sutradhar_api
+    sutradhar_cli
+
+[importlinter:contract:evals-below-apps]
+name = Evals never import the API or CLI (I18)
+type = forbidden
+source_modules =
+    sutradhar_evals
+forbidden_modules =
+    sutradhar_api
+    sutradhar_cli
+
+[importlinter:contract:api-below-cli]
+name = API never imports the CLI (I18)
+type = forbidden
+source_modules =
+    sutradhar_api
+forbidden_modules =
+    sutradhar_cli

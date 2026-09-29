@@ -1,0 +1,16 @@
+[project]
+name = "sutradhar-schemas"
+version = "0.1.0"
+description = "Sutradhar shared data contract: records, profiles, evidence envelopes, manifests."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "pydantic>=2.9",
+  "orjson>=3.10",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sutradhar_schemas"]

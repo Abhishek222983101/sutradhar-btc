@@ -1,0 +1,16 @@
+[project]
+name = "sutradhar-gen"
+version = "0.1.0"
+description = "Sutradhar synthetic world generator: UTXO economy, P2P propagation, sensors, ground truth."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "sutradhar-schemas",
+  "numpy>=2.1",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sutradhar_gen"]

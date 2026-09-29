@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+.hypothesis/
+
+# Node / web
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+apps/web/src/routeTree.gen.ts.bak
+playwright-report/
+test-results/
+
+# Data produced at runtime — never committed (synthetic or not)
+/data/
+/worlds/
+/demo-data/
+/reports/tmp/
+refdata/snapshots/
+*.duckdb
+*.duckdb.wal
+*.sqlite
+*.sqlite-journal
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Deploy tooling state
+.vercel/
+.railway/

@@ -1,0 +1,22 @@
+line-length = 110
+target-version = "py312"
+extend-exclude = ["apps/web", "node_modules", "worlds", "data"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "C4", "PT", "N", "PL", "PERF"]
+ignore = [
+  "E501",     # line length is handled by the formatter
+  "PLR0913",  # engine stages legitimately take many parameters
+  "PLR2004",  # magic values are allowed in tests and thresholds live in settings
+  "PLC0415",  # local imports are used deliberately to keep CLI start-up fast
+]
+
+[lint.per-file-ignores]
+"**/tests/**" = ["S101", "S311", "S603", "S607", "PLR0915", "N802"]
+"tests/**" = ["S101", "S311", "S603", "S607", "PLR0915", "N802"]
+
+[lint.isort]
+known-first-party = ["sutradhar_schemas", "sutradhar_engine", "sutradhar_gen", "sutradhar_evals", "sutradhar_cli", "sutradhar_api"]
+
+[format]
+quote-style = "double"

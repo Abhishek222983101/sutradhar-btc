@@ -1,0 +1,15 @@
+[project]
+name = "sutradhar-engine"
+version = "0.1.0"
+description = "Sutradhar analytics engine: ingestion, enrichment, graph, models, explanations, evidence."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "sutradhar-schemas",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sutradhar_engine"]
