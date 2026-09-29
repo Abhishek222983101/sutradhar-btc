@@ -7,7 +7,7 @@ Legend: ✅ done · 🔨 in progress · ⏳ not started
 
 | Sub-phase | Status | Tests | Security gate | Notes |
 |---|---|---|---|---|
-| P0.1 Repository, workspaces, tooling | 🔨 | | | |
+| P0.1 Repository, workspaces, tooling | ✅ | 10 passed | ruff-S ✓ bandit ✓ pip-audit ✓ gitleaks ✓ (1 reviewed FP) | uv workspace, 5 import contracts, CI |
 | P0.2 Data contract v1 and shared schemas | ⏳ | | | |
 | P0.3 Generator v0 ("tiny") | ⏳ | | | |
 | P0.4 Engine skeleton | ⏳ | | | |
