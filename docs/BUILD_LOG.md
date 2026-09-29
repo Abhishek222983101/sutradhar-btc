@@ -9,7 +9,7 @@ Legend: ✅ done · 🔨 in progress · ⏳ not started
 |---|---|---|---|---|
 | P0.1 Repository, workspaces, tooling | ✅ | 10 passed | ruff-S ✓ bandit ✓ pip-audit ✓ gitleaks ✓ (1 reviewed FP) | uv workspace, 5 import contracts, CI |
 | P0.2 Data contract v1 and shared schemas | ✅ | 74 passed (26 security) | ruff-S ✓ bandit ✓ pip-audit ✓ gitleaks ✓ | Security tests caught 2 real input-handling gaps (huge exponents, underscore numerals) — fixed |
-| P0.3 Generator v0 ("tiny") | ⏳ | | | |
+| P0.3 Generator v0 ("tiny") | ✅ | 91 passed (27 security) | ruff-S ✓ bandit ✓ pip-audit ✓ gitleaks ✓ | tiny world: 217 tx, 5,425 obs in 2.7 s; byte-identical per seed; v0 IPs confined to RFC 5737 |
 | P0.4 Engine skeleton | ⏳ | | | |
 | P0.5 API skeleton | ⏳ | | | |
 | P0.6 Web shell | ⏳ | | | |

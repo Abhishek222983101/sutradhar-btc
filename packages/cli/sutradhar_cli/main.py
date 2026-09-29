@@ -46,5 +46,32 @@ def schemas_export(
     typer.echo(f"wrote {out}")
 
 
+gen_app = typer.Typer(
+    help="Generate synthetic worlds (both network and ledger layers, with ground truth).",
+    no_args_is_help=True,
+)
+app.add_typer(gen_app, name="gen")
+
+
+@gen_app.command("run")
+def gen_run(
+    scenario: Annotated[str, typer.Option(help="Preset scenario name.")] = "tiny",
+    seed: Annotated[int, typer.Option(help="Seed; same scenario + seed gives byte-identical output.")] = 1,
+    out: Annotated[Path, typer.Option(help="Output directory.")] = Path("worlds/tiny"),
+) -> None:
+    """Generate one world into OUT/data (what the system sees) and OUT/truth (evaluation only)."""
+    from sutradhar_gen.config import PRESETS
+    from sutradhar_gen.generate import generate
+
+    if scenario not in PRESETS:
+        raise typer.BadParameter(f"unknown scenario {scenario!r}; choose from {sorted(PRESETS)}")
+    summary = generate(PRESETS[scenario], seed, out)
+    counts = summary["counts"]
+    typer.echo(
+        f"{scenario} (seed {seed}): {counts['txs_exported']} transactions, "
+        f"{counts['observations']} observations, {counts['nodes']} nodes -> {out}"
+    )
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
