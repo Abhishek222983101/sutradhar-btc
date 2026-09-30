@@ -49,6 +49,28 @@ Legend: ✅ done · 🟡 done with a known gap
 | P4.6 Fingerprints | ✅ | behavioural vectors feed suggestions |
 | P4.7 Network evaluation | ✅ | in EVAL.md |
 
+## P5 — Risk, ranking & explanations
+
+| Sub-phase | Status | Notes |
+|---|---|---|
+| P5.1 Watchlists | ✅ | CRUD + CSV import (validated, per-row error report), frozen per-run snapshot (`seeds.csv`, checksum in manifest) |
+| P5.2 Services & victims | ✅ | E20: exchange/batch-payer scoring; victims excluded from actor leads |
+| P5.3 Risk: taint, PPR, paths, cash-out | ✅ | E13 haircut taint with service-stop + hop decay (Hypothesis property-tested); E21 personalized PageRank, k-best paths, cash-out detection |
+| P5.4 Anomaly | ✅ | E08 Isolation Forest, tested on injected outliers |
+| P5.5 Actor features + lead_ranker | ✅ | E22: 36 features; LightGBM + isotonic calibration, trained on 3 scenarios incl. hard look-alikes, tested on unseen worlds |
+| P5.6 Lead generation, grades, priority, carry-over | ✅ | 5 lead types (ACTOR/CASHOUT/CHAIN/TX/IP); grade from independent evidence families; state survives re-runs; diff endpoint |
+| P5.7 Explanations | ✅ | E18: TreeSHAP-style contributions, language-guard-checked templates, counterfactuals, bounded evidence subgraph |
+| P5.8 Publish, diff, watchlist hits | ✅ | I6 invariant checked before publish; language guard checked before publish; SSE `lead.watchlist_hit` |
+
+Also built beyond the minimum: benign look-alike actors (merchants/payroll/traders) as hard negatives for every
+detector; object pages + omnibox search (actors/addresses/tx/IPs); cases with notes; evidence-pack/GraphML/MISP/i2csv
+export; `/verify` endpoint; prebuilt hero world (instant demo boot, no compute).
+
+Honest numbers (rich scenario, 5 unseen seeds — see `docs/EVAL.md` for the full table, reproducible with
+`uv run sutradhar evals report`): origin IP top-1 39.1% (baseline 4.4%, earliest-announcer rule 37.5%, ceiling 67.8%);
+lead ranker PR-AUC 0.983 with watchlist seeds / 0.980 without; CoinJoin detection 100%/100% on 30 generated mixes;
+change-address identification 95.2%; published CHAIN leads are 100% real peeling chains.
+
 ## Deviations from the blueprint
 
 | Change | Why |
