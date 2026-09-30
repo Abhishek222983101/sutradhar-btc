@@ -48,6 +48,8 @@ class OriginMetrics:
     top1_accuracy: float
     top3_accuracy: float
     random_baseline: float
+    first_spy_top1: float
+    ceiling: float  # share of observable transactions whose true origin announced at all
 
 
 def origin_accuracy(world: WorldRun) -> OriginMetrics:
@@ -62,7 +64,23 @@ def origin_accuracy(world: WorldRun) -> OriginMetrics:
     pool = con.execute(
         "SELECT avg(1.0 / n) FROM (SELECT count(DISTINCT src_ip) n FROM ds.obs WHERE src_ip IS NOT NULL GROUP BY txid)"
     ).fetchone()
+    spy = pl.from_arrow(
+        con.execute(
+            "SELECT txid, arg_min(src_ip, ts_us) AS ip FROM ds.obs WHERE src_ip IS NOT NULL GROUP BY txid"
+        ).arrow()
+    )
+    announced = pl.from_arrow(
+        con.execute("SELECT DISTINCT txid, src_ip AS ip FROM ds.obs WHERE src_ip IS NOT NULL").arrow()
+    )
     con.close()
+    heard = (
+        truth.join(announced, on="txid")
+        .group_by("txid")
+        .agg((pl.col("origin_ip") == pl.col("ip")).any().alias("h"))
+    )
+    ceiling = round(float(heard["h"].sum()) / truth.height, 4) if truth.height else 0.0
+    js = truth.join(spy, on="txid")
+    first_spy = round(float((js["origin_ip"] == js["ip"]).mean()), 4) if js.height else 0.0
     j1 = truth.join(top1, on="txid")
     j3 = truth.join(top3, on="txid")
     t1 = float((j1["origin_ip"] == j1["ip"]).mean()) if j1.height else 0.0
@@ -72,7 +90,9 @@ def origin_accuracy(world: WorldRun) -> OriginMetrics:
         else 0.0
     )
     baseline = round(float(pool[0]), 4) if pool and pool[0] else 0.0
-    return OriginMetrics(truth.height, total, round(t1, 4), round(t3, 4), round(baseline, 4))
+    return OriginMetrics(
+        truth.height, total, round(t1, 4), round(t3, 4), round(baseline, 4), first_spy, ceiling
+    )
 
 
 @dataclass(frozen=True)
@@ -154,6 +174,101 @@ def purity_without_guard(world: WorldRun) -> float:
 
 
 @dataclass(frozen=True)
+class ChangeMetrics:
+    scored_outputs: int
+    argmax_accuracy: float  # per transaction, is the highest-scoring output the true change?
+    merge_links: int  # outputs at or above the merge threshold
+    merge_precision: float  # of those, how many are truly change
+
+
+def change_detection(world: WorldRun, merge_p: float | None = None) -> ChangeMetrics:
+    merge_p = EngineSettings().change_merge_min_p if merge_p is None else merge_p
+    truth = pl.read_parquet(world.world_dir / "truth" / "outputs.parquet").select(
+        "txid", pl.col("vout").alias("idx"), "is_change"
+    )
+    con = duckdb.connect(str(world.run_dir / "run.duckdb"), read_only=True)
+    scored = pl.from_arrow(con.execute("SELECT txid, idx, p FROM change").arrow())
+    con.close()
+    if not scored.height:
+        return ChangeMetrics(0, 0.0, 0, 1.0)
+    joined = scored.join(truth, on=["txid", "idx"])
+    best = joined.sort("p", descending=True).group_by("txid", maintain_order=True).first()
+    has_change = joined.group_by("txid").agg(pl.col("is_change").any().alias("any")).filter(pl.col("any"))
+    best = best.join(has_change.select("txid"), on="txid")
+    links = joined.filter(pl.col("p") >= merge_p)
+    return ChangeMetrics(
+        joined.height,
+        round(float(best["is_change"].mean()), 4) if best.height else 0.0,
+        links.height,
+        round(float(links["is_change"].mean()), 4) if links.height else 1.0,
+    )
+
+
+@dataclass(frozen=True)
+class PeelMetrics:
+    truth_hops: int
+    detected_txs: int
+    precision: float
+    recall: float
+
+
+def peel_detection(world: WorldRun) -> PeelMetrics:
+    truth = pl.read_parquet(world.world_dir / "truth" / "txs.parquet").filter(
+        pl.col("exported") & pl.col("peel_chain_id").is_not_null()
+    )
+    actual = set(truth["txid"].to_list())
+    con = duckdb.connect(str(world.run_dir / "run.duckdb"), read_only=True)
+    found = {r[0] for r in con.execute("SELECT txid FROM peel_chain").fetchall()}
+    con.close()
+    tp = len(actual & found)
+    return PeelMetrics(
+        len(actual),
+        len(found),
+        round(tp / len(found), 4) if found else 1.0,
+        round(tp / len(actual), 4) if actual else 1.0,
+    )
+
+
+@dataclass(frozen=True)
+class SuggestionMetrics:
+    suggestions: int
+    precision_top50: float
+    random_pair_rate: float
+
+
+def suggestion_quality(world: WorldRun, k: int = 50) -> SuggestionMetrics:
+    addr = pl.read_parquet(world.world_dir / "truth" / "addresses.parquet").select("address", "agent_id")
+    con = duckdb.connect(str(world.run_dir / "run.duckdb"), read_only=True)
+    cl = pl.from_arrow(con.execute("SELECT address, cluster_id FROM cluster").arrow()).join(
+        addr, on="address"
+    )
+    sug = pl.from_arrow(
+        con.execute("SELECT a, b FROM merge_suggestion ORDER BY score DESC, a, b LIMIT ?", [k]).arrow()
+    )
+    total = con.execute("SELECT count(*) FROM merge_suggestion").fetchone()
+    con.close()
+    owner = (
+        cl.group_by("cluster_id", "agent_id")
+        .len()
+        .sort("len", descending=True)
+        .group_by("cluster_id", maintain_order=True)
+        .first()
+    )
+    per_agent = owner.group_by("agent_id").len()["len"].to_list()
+    n = owner.height
+    pairs = n * (n - 1) / 2
+    random_rate = sum(c * (c - 1) / 2 for c in per_agent) / pairs if pairs else 0.0
+    m = dict(zip(owner["cluster_id"].to_list(), owner["agent_id"].to_list(), strict=True))
+    hits = [
+        m.get(a) is not None and m.get(a) == m.get(b)
+        for a, b in zip(sug["a"].to_list(), sug["b"].to_list(), strict=True)
+    ]
+    return SuggestionMetrics(
+        int(total[0]) if total else 0, round(sum(hits) / len(hits), 4) if hits else 0.0, round(random_rate, 6)
+    )
+
+
+@dataclass(frozen=True)
 class EvalReport:
     scenario: str
     seed: int
@@ -161,6 +276,9 @@ class EvalReport:
     cluster: ClusterMetrics
     coinjoin: CoinJoinMetrics
     purity_if_coinjoins_merged: float
+    change: ChangeMetrics
+    peel: PeelMetrics
+    suggest: SuggestionMetrics
 
     def to_dict(self) -> dict:
         return {
@@ -170,6 +288,9 @@ class EvalReport:
             "cluster": asdict(self.cluster),
             "coinjoin": asdict(self.coinjoin),
             "purity_if_coinjoins_merged": self.purity_if_coinjoins_merged,
+            "change": asdict(self.change),
+            "peel": asdict(self.peel),
+            "suggest": asdict(self.suggest),
         }
 
 
@@ -182,4 +303,7 @@ def evaluate(cfg: ScenarioConfig, seed: int, out: Path) -> EvalReport:
         cluster_purity(world),
         coinjoin_detection(world),
         purity_without_guard(world),
+        change_detection(world),
+        peel_detection(world),
+        suggestion_quality(world),
     )

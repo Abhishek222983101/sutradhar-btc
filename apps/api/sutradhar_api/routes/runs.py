@@ -253,3 +253,39 @@ def lead_evidence(
     finally:
         con.close()
     return {"ip": ip, "cluster_id": cluster_id, "addresses": wallet, "transactions": out}
+
+
+@router.get("/runs/{run_id}/suggestions")
+def merge_suggestions(
+    run_id: str,
+    request: Request,
+    principal: Annotated[Principal, require(Action.VIEW)],
+    db: ReadDB,
+    limit: Limit = 20,
+    cursor: Cursor = None,
+) -> Page[dict[str, Any]]:
+    """Wallet-cluster pairs that may belong to one operator (for an analyst to accept or reject), with reasons."""
+    import json
+
+    import duckdb
+
+    run = _visible_run(db, run_id, principal)
+    path = request.app.state.settings.data_dir / "runs" / run.id / "run.duckdb"
+    if not path.exists():
+        return Page[dict[str, Any]](items=[], next_cursor=None)
+    after = decode_cursor(cursor, (int,))
+    offset = after[0] if after else 0
+    con = duckdb.connect(str(path), read_only=True)
+    try:
+        have = {r[0] for r in con.execute("SELECT table_name FROM information_schema.tables").fetchall()}
+        if "merge_suggestion" not in have:
+            return Page[dict[str, Any]](items=[], next_cursor=None)
+        rows = con.execute(
+            "SELECT a, b, score, reasons FROM merge_suggestion ORDER BY score DESC, a, b LIMIT ? OFFSET ?",
+            [limit + 1, offset],
+        ).fetchall()
+    finally:
+        con.close()
+    more, rows = len(rows) > limit, rows[:limit]
+    items = [{"a": r[0], "b": r[1], "score": r[2], "reasons": json.loads(r[3])} for r in rows]
+    return Page[dict[str, Any]](items=items, next_cursor=encode_cursor([offset + limit]) if more else None)

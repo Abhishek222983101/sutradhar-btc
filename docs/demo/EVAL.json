@@ -1,19 +1,32 @@
 {
+  "change_argmax_accuracy_mean": 0.9626,
+  "change_merge_links_total": 113,
+  "change_merge_precision_mean": 0.9913,
   "coinjoin_precision_mean": null,
   "coinjoin_recall_mean": null,
   "coinjoins_evaluated": 0,
   "observable_transactions_total": 332,
+  "origin_ceiling_mean": 0.6796,
+  "origin_first_spy_mean": 0.3775,
   "origin_random_baseline_mean": 0.0451,
   "origin_top1_mean": 0.3915,
   "origin_top1_stdev": 0.0514,
   "origin_top3_mean": 0.5132,
+  "peel_precision_mean": 1.0,
+  "peel_recall_mean": 1.0,
   "purity_if_coinjoins_merged_mean": 1.0,
   "runs": [
     {
+      "change": {
+        "argmax_accuracy": 0.971,
+        "merge_links": 23,
+        "merge_precision": 1.0,
+        "scored_outputs": 420
+      },
       "cluster": {
         "addresses_in_impure": 0,
-        "clusters": 208,
-        "pure_clusters": 208,
+        "clusters": 191,
+        "pure_clusters": 191,
         "purity": 1.0
       },
       "coinjoin": {
@@ -23,21 +36,40 @@
         "truth_coinjoins": 0
       },
       "origin": {
+        "ceiling": 0.6111,
+        "first_spy_top1": 0.3519,
         "observable_transactions": 54,
         "random_baseline": 0.0458,
         "top1_accuracy": 0.3704,
         "top3_accuracy": 0.4815,
         "total_transactions": 217
       },
+      "peel": {
+        "detected_txs": 5,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_hops": 5
+      },
       "purity_if_coinjoins_merged": 1.0,
       "scenario": "demo",
-      "seed": 1
+      "seed": 1,
+      "suggest": {
+        "precision_top50": 0.14,
+        "random_pair_rate": 0.011573,
+        "suggestions": 200
+      }
     },
     {
+      "change": {
+        "argmax_accuracy": 0.9673,
+        "merge_links": 23,
+        "merge_precision": 1.0,
+        "scored_outputs": 434
+      },
       "cluster": {
         "addresses_in_impure": 0,
-        "clusters": 216,
-        "pure_clusters": 216,
+        "clusters": 200,
+        "pure_clusters": 200,
         "purity": 1.0
       },
       "coinjoin": {
@@ -47,21 +79,40 @@
         "truth_coinjoins": 0
       },
       "origin": {
+        "ceiling": 0.6164,
+        "first_spy_top1": 0.3151,
         "observable_transactions": 73,
         "random_baseline": 0.0451,
         "top1_accuracy": 0.3288,
         "top3_accuracy": 0.4521,
         "total_transactions": 224
       },
+      "peel": {
+        "detected_txs": 5,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_hops": 5
+      },
       "purity_if_coinjoins_merged": 1.0,
       "scenario": "demo",
-      "seed": 2
+      "seed": 2,
+      "suggest": {
+        "precision_top50": 0.14,
+        "random_pair_rate": 0.011759,
+        "suggestions": 200
+      }
     },
     {
+      "change": {
+        "argmax_accuracy": 0.9513,
+        "merge_links": 30,
+        "merge_precision": 1.0,
+        "scored_outputs": 454
+      },
       "cluster": {
         "addresses_in_impure": 0,
-        "clusters": 229,
-        "pure_clusters": 229,
+        "clusters": 205,
+        "pure_clusters": 205,
         "purity": 1.0
       },
       "coinjoin": {
@@ -71,22 +122,41 @@
         "truth_coinjoins": 0
       },
       "origin": {
+        "ceiling": 0.5488,
+        "first_spy_top1": 0.3415,
         "observable_transactions": 82,
         "random_baseline": 0.0446,
         "top1_accuracy": 0.3659,
         "top3_accuracy": 0.4756,
         "total_transactions": 237
       },
+      "peel": {
+        "detected_txs": 5,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_hops": 5
+      },
       "purity_if_coinjoins_merged": 1.0,
       "scenario": "demo",
-      "seed": 3
+      "seed": 3,
+      "suggest": {
+        "precision_top50": 0.06,
+        "random_pair_rate": 0.010904,
+        "suggestions": 200
+      }
     },
     {
+      "change": {
+        "argmax_accuracy": 0.9613,
+        "merge_links": 23,
+        "merge_precision": 0.9565,
+        "scored_outputs": 370
+      },
       "cluster": {
-        "addresses_in_impure": 0,
-        "clusters": 186,
-        "pure_clusters": 186,
-        "purity": 1.0
+        "addresses_in_impure": 6,
+        "clusters": 167,
+        "pure_clusters": 166,
+        "purity": 0.994
       },
       "coinjoin": {
         "flagged": 0,
@@ -95,21 +165,40 @@
         "truth_coinjoins": 0
       },
       "origin": {
+        "ceiling": 0.7467,
+        "first_spy_top1": 0.4,
         "observable_transactions": 75,
         "random_baseline": 0.0446,
         "top1_accuracy": 0.4133,
         "top3_accuracy": 0.5733,
         "total_transactions": 191
       },
+      "peel": {
+        "detected_txs": 5,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_hops": 5
+      },
       "purity_if_coinjoins_merged": 1.0,
       "scenario": "demo",
-      "seed": 4
+      "seed": 4,
+      "suggest": {
+        "precision_top50": 0.08,
+        "random_pair_rate": 0.014501,
+        "suggestions": 200
+      }
     },
     {
+      "change": {
+        "argmax_accuracy": 0.962,
+        "merge_links": 14,
+        "merge_precision": 1.0,
+        "scored_outputs": 374
+      },
       "cluster": {
         "addresses_in_impure": 0,
-        "clusters": 189,
-        "pure_clusters": 189,
+        "clusters": 180,
+        "pure_clusters": 180,
         "purity": 1.0
       },
       "coinjoin": {
@@ -119,15 +208,28 @@
         "truth_coinjoins": 0
       },
       "origin": {
+        "ceiling": 0.875,
+        "first_spy_top1": 0.4792,
         "observable_transactions": 48,
         "random_baseline": 0.0456,
         "top1_accuracy": 0.4792,
         "top3_accuracy": 0.5833,
         "total_transactions": 194
       },
+      "peel": {
+        "detected_txs": 5,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_hops": 5
+      },
       "purity_if_coinjoins_merged": 1.0,
       "scenario": "demo",
-      "seed": 5
+      "seed": 5,
+      "suggest": {
+        "precision_top50": 0.16,
+        "random_pair_rate": 0.012601,
+        "suggestions": 200
+      }
     }
   ],
   "scenario": "demo",
@@ -138,5 +240,7 @@
     4,
     5
   ],
-  "wallet_cluster_purity_mean": 1.0
+  "suggest_precision_mean": 0.116,
+  "suggest_random_rate_mean": 0.012268,
+  "wallet_cluster_purity_mean": 0.9988
 }

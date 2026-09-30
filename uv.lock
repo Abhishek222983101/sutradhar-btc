@@ -1220,6 +1220,7 @@ dependencies = [
     { name = "polars" },
     { name = "pyarrow" },
     { name = "scikit-learn" },
+    { name = "scipy" },
     { name = "sutradhar-schemas" },
 ]
 
@@ -1233,6 +1234,7 @@ requires-dist = [
     { name = "polars", specifier = ">=1.18" },
     { name = "pyarrow", specifier = ">=18" },
     { name = "scikit-learn", specifier = ">=1.9.1" },
+    { name = "scipy", specifier = ">=1.18.1" },
     { name = "sutradhar-schemas", editable = "packages/schemas" },
 ]
 

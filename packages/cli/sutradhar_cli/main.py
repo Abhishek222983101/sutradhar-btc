@@ -324,6 +324,15 @@ def evals_train_origin() -> None:
     typer.echo(f"trained origin-lr@1 on {info['rows']} candidate rows ({info['positives']} true origins)")
 
 
+@evals_app.command("train-change")
+def evals_train_change() -> None:
+    """Train the change-address model on generated worlds (seeds 200-215) and write its JSON weights."""
+    from sutradhar_evals.train_change import main as train
+
+    info = train()["trained_on"]
+    typer.echo(f"trained change-lr@1 on {info['rows']} outputs ({info['positives']} change outputs)")
+
+
 audit_app = typer.Typer(help="The audit chain.", no_args_is_help=True)
 app.add_typer(audit_app, name="audit")
 

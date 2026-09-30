@@ -83,7 +83,7 @@ def run_stages(ctx: RunContext, stages: Sequence[Stage], *, resume_after: str | 
         if not started:
             started = stage.code == resume_after
             continue
-        if stage.code not in ctx.capability.enabled_stages:
+        if stage.code.startswith("E") and stage.code not in ctx.capability.enabled_stages:
             ctx.stats[stage.code] = StageStat(
                 ms=0, notes=["skipped: disabled by the dataset's capability profile"]
             )

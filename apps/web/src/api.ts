@@ -65,3 +65,6 @@ export type Eval = { seeds: number[]; origin_top1_mean: number; origin_top3_mean
 export type Dataset = { id: string; name: string; status: string; row_count: number | null; reject_count: number | null; xray: XRay | null };
 export type XRay = { rows: number; txs: number; addresses: number; ips: number; network: { observation_model: string; sensors_inferred: number; distinct_src_ips: number; obs_per_tx_p50: number }; quality: Record<string, number>; enabled_stages: string[]; disabled_features: string[]; warnings: string[] };
 export type Reject = { file_id: string; row_no: number; rule: string; field: string | null; value: string | null; message: string };
+export type Stage = { ms: number; rows: Record<string, number>; notes: string[] };
+export type RunInfo = { id: string; status: string; result_digest: string | null; manifest: { stages: Record<string, Stage> } | null };
+export type Suggestion = { a: string; b: string; score: number; reasons: string[] };

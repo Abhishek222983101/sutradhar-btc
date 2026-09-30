@@ -19,7 +19,11 @@ class EngineSettings(BaseModel):
     # E17 stub (replaced by lead_ranker in P5)
     stub_peel_ratio: float = Field(default=3.0, gt=1)
     peel_min_hops: int = Field(default=3, ge=2)
+    peel_max_gap_h: float = Field(
+        default=1.0, gt=0, description="Longest pause between hops of one peel chain"
+    )
     coinjoin_min_p: float = Field(default=0.5, gt=0, le=1)
+    change_merge_min_p: float = Field(default=0.99, gt=0.5, le=1)
 
     def sha256(self) -> str:
         return sha256_json(self.model_dump(mode="json"))

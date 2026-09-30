@@ -10,6 +10,11 @@ from sutradhar_engine.runner import RunContext, StageReport
 
 TXS_SQL = "SELECT i.txid, list(i.address ORDER BY i.idx) AS addrs FROM ds.txin i GROUP BY i.txid"
 CJ_SQL = "SELECT txid FROM coinjoin WHERE p >= ?"
+CHANGE_SQL = """
+SELECT o.address, (SELECT min(i.address) FROM ds.txin i WHERE i.txid = o.txid) AS sender
+FROM change c JOIN ds.txout o ON o.txid = c.txid AND o.idx = c.idx
+WHERE c.p >= ? AND o.txid NOT IN (SELECT txid FROM coinjoin WHERE p >= ?)
+"""
 
 
 class _UnionFind:
@@ -32,7 +37,7 @@ class _UnionFind:
 class ClusterStage:
     code = "E05"
     name = "wallet clustering"
-    requires = ("coinjoin",)
+    requires = ("coinjoin", "change")
     produces = ("cluster",)
 
     def run(self, ctx: RunContext) -> StageReport:
@@ -47,12 +52,25 @@ class ClusterStage:
                 continue
             for a in addrs[1:]:
                 uf.union(addrs[0], a)
+        merged = 0
+        for change_addr, sender in con.execute(
+            CHANGE_SQL, [ctx.settings.change_merge_min_p, ctx.settings.coinjoin_min_p]
+        ).fetchall():
+            if sender is not None:
+                uf.union(sender, change_addr)
+                merged += 1
         rows = sorted((a, uf.find(a)) for a in uf.parent)
         con.execute("CREATE TABLE cluster (address VARCHAR PRIMARY KEY, cluster_id VARCHAR NOT NULL)")
         if rows:
             con.executemany("INSERT INTO cluster VALUES (?, ?)", rows)
         n = len({c for _, c in rows})
-        return StageReport(rows={"cluster": n}, notes=[f"{skipped} CoinJoin-shaped transactions excluded"])
+        return StageReport(
+            rows={"cluster": n},
+            notes=[
+                f"{skipped} CoinJoin transactions excluded",
+                f"{merged} confident change outputs linked to their sender",
+            ],
+        )
 
 
 STAGE = ClusterStage()

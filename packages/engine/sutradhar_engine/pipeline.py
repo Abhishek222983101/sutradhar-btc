@@ -9,17 +9,25 @@ from pathlib import Path
 import duckdb
 import numpy as np
 
+from sutradhar_engine.plugins import load_plugin_stages
 from sutradhar_engine.runner import Progress, RunContext, Stage, _noop, run_stages
 from sutradhar_engine.settings import EngineSettings
 from sutradhar_engine.stages import (
     e01_load,
     e02_enrich,
+    e03_flows,
     e04_coinjoin,
     e05_cluster,
+    e06_change,
     e07_peel,
     e08_anomaly,
     e09_origin,
+    e11_coorigin,
+    e12_embed,
     e13_taint,
+    e14_fingerprint,
+    e15_motifs,
+    e16_suggest,
     e17_rank,
     e19_publish,
 )
@@ -31,14 +39,29 @@ DEFAULT_STAGES: tuple[Stage, ...] = (
     e01_load.STAGE,
     e02_enrich.STAGE,
     e04_coinjoin.STAGE,
+    e06_change.STAGE,
     e05_cluster.STAGE,
+    e03_flows.STAGE,
+    e12_embed.STAGE,
+    e15_motifs.STAGE,
     e07_peel.STAGE,
     e08_anomaly.STAGE,
     e09_origin.STAGE,
+    e11_coorigin.STAGE,
     e13_taint.STAGE,
+    e14_fingerprint.STAGE,
+    e16_suggest.STAGE,
     e17_rank.STAGE,
     e19_publish.STAGE,
 )
+
+
+def with_plugins(stages: Sequence[Stage]) -> tuple[Stage, ...]:
+    """Core stages with plugin stages inserted just before lead ranking (E17)."""
+    extra = load_plugin_stages()
+    core = list(stages)
+    at = next((i for i, st in enumerate(core) if st.code == "E17"), len(core))
+    return tuple([*core[:at], *extra, *core[at:]])
 
 
 def _sql_path(path: Path) -> str:
@@ -52,7 +75,7 @@ def run_pipeline(
     *,
     settings: EngineSettings | None = None,
     progress: Progress = _noop,
-    stages: Sequence[Stage] = DEFAULT_STAGES,
+    stages: Sequence[Stage] | None = None,
 ) -> RunManifest:
     check_id(run_id, "run")
     settings = settings or EngineSettings()
@@ -84,7 +107,7 @@ def run_pipeline(
             rng=np.random.default_rng(settings.seed),
             progress=progress,
         )
-        run_stages(ctx, stages)
+        run_stages(ctx, with_plugins(DEFAULT_STAGES) if stages is None else stages)
         con.execute("DETACH ds")
         con.execute("CHECKPOINT")
     finally:

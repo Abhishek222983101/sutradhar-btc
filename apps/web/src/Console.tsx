@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Evidence, type Lead } from "./api";
 import DataPanel from "./DataPanel";
+import PipelinePanel from "./PipelinePanel";
 
 const TYPES = ["ALL", "ACTOR", "CHAIN", "TX"] as const;
 const NAMES: Record<string, string> = { ACTOR: "Wallet", CHAIN: "Peel chain", TX: "Unusual tx" };
@@ -58,6 +59,7 @@ export default function Console({ home }: { home: () => void }) {
       </div>
       <div className="detail">
         {sel ? <Detail lead={sel} /> : <div className="panel empty">Select a lead.</div>}
+        <PipelinePanel runId={runId} />
         <DataPanel datasetId={datasetId} />
         <p><a href="#/" onClick={home}>Back to the requirement board</a></p>
       </div>

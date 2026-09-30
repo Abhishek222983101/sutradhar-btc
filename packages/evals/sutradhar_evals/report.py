@@ -32,12 +32,21 @@ def main(scenario: str = "rich", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
         "origin_top1_mean": round(statistics.mean(top1), 4),
         "origin_top1_stdev": round(statistics.pstdev(top1), 4) if len(top1) > 1 else 0.0,
         "origin_top3_mean": round(statistics.mean(top3), 4),
+        "origin_ceiling_mean": round(statistics.mean(r.origin.ceiling for r in reports), 4),
+        "origin_first_spy_mean": round(statistics.mean(r.origin.first_spy_top1 for r in reports), 4),
+        "peel_precision_mean": round(statistics.mean(r.peel.precision for r in reports), 4),
+        "peel_recall_mean": round(statistics.mean(r.peel.recall for r in reports), 4),
+        "suggest_precision_mean": round(statistics.mean(r.suggest.precision_top50 for r in reports), 4),
+        "suggest_random_rate_mean": round(statistics.mean(r.suggest.random_pair_rate for r in reports), 6),
         "origin_random_baseline_mean": round(statistics.mean(baseline), 4),
         "wallet_cluster_purity_mean": round(statistics.mean(purity), 4),
         "observable_transactions_total": sum(r.origin.observable_transactions for r in reports),
         "coinjoin_precision_mean": round(statistics.mean(c.precision for c in cj), 4) if cj else None,
         "coinjoin_recall_mean": round(statistics.mean(c.recall for c in cj), 4) if cj else None,
         "coinjoins_evaluated": sum(c.truth_coinjoins for c in cj),
+        "change_argmax_accuracy_mean": round(statistics.mean(r.change.argmax_accuracy for r in reports), 4),
+        "change_merge_precision_mean": round(statistics.mean(r.change.merge_precision for r in reports), 4),
+        "change_merge_links_total": sum(r.change.merge_links for r in reports),
         "purity_if_coinjoins_merged_mean": round(
             statistics.mean(r.purity_if_coinjoins_merged for r in reports), 4
         ),
@@ -54,7 +63,9 @@ def main(scenario: str = "rich", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
         "|---|---|",
         f"| Origin IP found, first try (top-1) | **{summary['origin_top1_mean']:.1%}** (± {summary['origin_top1_stdev']:.1%} across seeds) |",
         f"| Origin IP in top 3 candidates | **{summary['origin_top3_mean']:.1%}** |",
-        f"| Random-guess baseline (informational) | {summary['origin_random_baseline_mean']:.1%} |",
+        f"| Ceiling: true origin announced to a sensor at all | {summary['origin_ceiling_mean']:.1%} |",
+        f'| Baseline: earliest announcer wins ("first-spy") | {summary["origin_first_spy_mean"]:.1%} |',
+        f"| Baseline: random guess among announcers | {summary['origin_random_baseline_mean']:.1%} |",
         f"| Wallet cluster purity vs. hidden truth | **{summary['wallet_cluster_purity_mean']:.1%}** |",
         f"| Observable transactions evaluated | {summary['observable_transactions_total']} |",
     ]
@@ -64,6 +75,10 @@ def main(scenario: str = "rich", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
             f"| Cluster purity if CoinJoins were merged (ablation) | {summary['purity_if_coinjoins_merged_mean']:.1%} |",
         ]
     lines += [
+        f"| Peel-chain hops: precision / recall | {summary['peel_precision_mean']:.1%} / {summary['peel_recall_mean']:.1%} |",
+        f"| Merge suggestions (top 50): same operator | {summary['suggest_precision_mean']:.1%} (random pairs: {summary['suggest_random_rate_mean']:.2%}) |",
+        f"| Change output identified (per transaction) | **{summary['change_argmax_accuracy_mean']:.1%}** |",
+        f"| Change links used for clustering: precision | **{summary['change_merge_precision_mean']:.1%}** ({summary['change_merge_links_total']} links) |",
         "",
         "## Per-seed detail",
         "",
