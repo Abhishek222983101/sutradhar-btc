@@ -32,6 +32,8 @@ jobs:
         with: { node-version: 22 }
       - run: pnpm install --frozen-lockfile=false
         working-directory: apps/web
+      - run: pnpm test
+        working-directory: apps/web
       - run: pnpm build
         working-directory: apps/web
       - run: node scripts/check-no-external-urls.mjs

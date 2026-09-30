@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Evidence, type Lead } from "./api";
 import DataPanel from "./DataPanel";
+import { btc, pct } from "./format";
 import PipelinePanel from "./PipelinePanel";
 
 const TYPES = ["ALL", "ACTOR", "CHAIN", "TX"] as const;
 const NAMES: Record<string, string> = { ACTOR: "Wallet", CHAIN: "Peel chain", TX: "Unusual tx" };
-const btc = (sats: number) => (sats / 1e8).toFixed(4);
-const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 type Page<T> = { items: T[]; next_cursor: string | null };
 

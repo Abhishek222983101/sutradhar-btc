@@ -46,3 +46,21 @@ def lookup(ip: str) -> GeoResult:
     a = asn_db.get(str(addr)) or {}
     iso = (c.get("country") or {}).get("iso_code")
     return GeoResult(ip, iso, a.get("autonomous_system_number"), a.get("autonomous_system_organization"))
+
+
+def manifest() -> dict:
+    """Provenance of every bundled reference dataset (I20): source, licence, as-of date, checksum."""
+    import json
+
+    return json.loads((REFDATA / "manifest.json").read_text(encoding="utf-8"))
+
+
+def verify_files() -> list[str]:
+    """Names of bundled files whose checksum no longer matches the manifest (empty list means intact)."""
+    import hashlib
+
+    return [
+        e["file"]
+        for e in manifest()["datasets"]
+        if hashlib.sha256((REFDATA / e["file"]).read_bytes()).hexdigest() != e["sha256"]
+    ]

@@ -1,0 +1,20 @@
+{
+  "datasets": [
+    {
+      "file": "dbip-country-lite.mmdb",
+      "source": "https://download.db-ip.com/free/dbip-country-lite-2026-09.mmdb.gz",
+      "as_of": "2026-09",
+      "license": "CC BY 4.0 (attribution: IP Geolocation by DB-IP, https://db-ip.com)",
+      "sha256": "d284ae2e7427fe33d83465e1506b2b21aae47eb8a9b099f8f4dac6a98c99f041",
+      "bytes": 8340464
+    },
+    {
+      "file": "dbip-asn-lite.mmdb",
+      "source": "https://download.db-ip.com/free/dbip-asn-lite-2026-09.mmdb.gz",
+      "as_of": "2026-09",
+      "license": "CC BY 4.0 (attribution: IP Geolocation by DB-IP, https://db-ip.com)",
+      "sha256": "ab07c764a10c4f8c2f3539377fa86e5c928243084aafd359d1be4cb8543d7406",
+      "bytes": 9511026
+    }
+  ]
+}

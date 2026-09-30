@@ -81,3 +81,11 @@ def verify_audit(principal: Annotated[Principal, require(Action.AUDIT_VERIFY)], 
         broken_at=result.broken_at,
         reason=result.reason,
     )
+
+
+@router.get("/api/v1/refdata")
+def refdata(principal: Annotated[Principal, require(Action.VIEW)]) -> dict[str, Any]:
+    """Reference datasets bundled with the install: source, licence, as-of date and whether the files are intact."""
+    from sutradhar_engine.geoip import manifest, verify_files
+
+    return {**manifest(), "tampered": verify_files()}
