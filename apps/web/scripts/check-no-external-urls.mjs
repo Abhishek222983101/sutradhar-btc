@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const ALLOWED = [/^https:\/\/github\.com\/Abhishek222983101\/sutradhar-btc(\/blob\/main\/docs\/EVAL\.md)?$/, /^https?:\/\/www\.w3\.org\//, /^https?:\/\/reactjs\.org\//, /^https?:\/\/react\.dev\//];
+const ALLOWED = [/^https:\/\/github\.com\/Abhishek222983101\/sutradhar-btc(\/blob\/main\/docs\/(EVAL\.md|TECHNICAL_WRITEUP\.md))?$/, /^https?:\/\/www\.w3\.org\//, /^https?:\/\/reactjs\.org\//, /^https?:\/\/react\.dev\//];
 if (process.env.VITE_API_BASE_URL) ALLOWED.push(new RegExp("^" + process.env.VITE_API_BASE_URL.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")));
 const walk = (d) => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
 const bad = [];

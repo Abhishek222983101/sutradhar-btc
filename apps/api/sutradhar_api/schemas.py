@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -150,3 +150,22 @@ class AuditVerifyOut(BaseModel):
     head: str
     broken_at: int | None
     reason: str | None
+
+
+class MergeDecisionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str = Field(min_length=4, max_length=80)
+    a: str = Field(min_length=8, max_length=100)
+    b: str = Field(min_length=8, max_length=100)
+    decision: Literal["accept", "reject"]
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class MergeDecisionOut(Out):
+    id: str
+    a_ref: str
+    b_ref: str
+    decision: str
+    reason: str
+    run_id: str
+    created_at: datetime

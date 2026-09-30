@@ -10,6 +10,7 @@ const save = (s: Session | null) => {
   try { s ? sessionStorage.setItem(KEY, JSON.stringify(s)) : sessionStorage.removeItem(KEY); } catch { /* private mode */ }
 };
 export const hasSession = () => session !== null;
+export const role = (): string | null => session?.user.role ?? null;
 
 async function raw(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);

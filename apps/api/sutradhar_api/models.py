@@ -11,6 +11,7 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
+    CheckConstraint,
     Float,
     ForeignKey,
     Index,
@@ -258,3 +259,21 @@ class AuditHead(Base):
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
     seq: Mapped[int] = mapped_column(BigInteger)
     entry_hash: Mapped[str] = mapped_column(String(64))
+
+
+class MergeDecision(Base):
+    """An analyst's verdict on a merge suggestion; it survives re-runs because it is keyed by the cluster pair."""
+
+    __tablename__ = "merge_decisions"
+    __table_args__ = (
+        UniqueConstraint("a_ref", "b_ref", name="uq_merge_decisions_a_ref"),
+        CheckConstraint("decision IN ('accept', 'reject')", name="decision"),
+    )
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    a_ref: Mapped[str] = mapped_column(Text)
+    b_ref: Mapped[str] = mapped_column(Text)
+    decision: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)

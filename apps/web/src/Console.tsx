@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Evidence, type Lead } from "./api";
 import DataPanel from "./DataPanel";
 import { btc, pct } from "./format";
+import LinkGraph from "./LinkGraph";
 import PipelinePanel from "./PipelinePanel";
 
 const TYPES = ["ALL", "ACTOR", "CHAIN", "TX"] as const;
@@ -108,7 +109,8 @@ function EvidencePanel({ ev }: { ev: Evidence }) {
     <div className="panel">
       <h2>Evidence: {ev.transactions.length} transaction(s) from wallet {ev.cluster_id.slice(0, 10)}…</h2>
       <div className="body">
-        <p className="note">{ev.addresses.length} address(es) in this wallet, grouped because they were spent together.</p>
+        <p className="note">{ev.addresses.length} address(es) in this wallet, grouped because they were spent together. Thicker lines mean the IP is more likely the first sender.</p>
+        <LinkGraph ev={ev} />
         {ev.transactions.map((t) => <TxCard key={t.txid} tx={t} target={ev.ip} />)}
       </div>
     </div>

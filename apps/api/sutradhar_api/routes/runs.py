@@ -15,7 +15,7 @@ from sutradhar_api.auth.service import Principal
 from sutradhar_api.db import utcnow
 from sutradhar_api.deps import AppSettings, ReadDB, WriteDB, require
 from sutradhar_api.jobs.queue import enqueue, find_idempotent
-from sutradhar_api.models import Dataset, Job, Lead, LeadState, Run
+from sutradhar_api.models import Dataset, Job, Lead, LeadState, MergeDecision, Run
 from sutradhar_api.pagination import Cursor, Limit, Page, cursor_time, decode_cursor, encode_cursor
 from sutradhar_api.problems import Problem
 from sutradhar_api.routes.datasets import DEMO_MAX_ACTIVE_JOBS
@@ -24,6 +24,8 @@ from sutradhar_api.schemas import (
     LeadDetail,
     LeadOut,
     LeadStateOut,
+    MergeDecisionIn,
+    MergeDecisionOut,
     RunAccepted,
     RunDetail,
     RunIn,
@@ -289,3 +291,64 @@ def merge_suggestions(
     more, rows = len(rows) > limit, rows[:limit]
     items = [{"a": r[0], "b": r[1], "score": r[2], "reasons": json.loads(r[3])} for r in rows]
     return Page[dict[str, Any]](items=items, next_cursor=encode_cursor([offset + limit]) if more else None)
+
+
+@router.post("/merge-decisions", status_code=201)
+def decide_merge(
+    body: MergeDecisionIn, principal: Annotated[Principal, require(Action.MERGE_DECIDE)], db: WriteDB
+) -> MergeDecisionOut:
+    """Lead analysts accept or reject a suggested merge. It is recorded with a reason and audited; the pair is
+    stored in sorted order so (a, b) and (b, a) are the same decision. A later decision replaces an earlier one."""
+    run = _visible_run(db, body.run_id, principal)
+    a, b = sorted((body.a, body.b))
+    if a == b:
+        raise Problem(422, "validation", "a cluster cannot be merged with itself")
+    row = db.scalar(select(MergeDecision).where(MergeDecision.a_ref == a, MergeDecision.b_ref == b))
+    if row is None:
+        row = MergeDecision(id=new_id("mp"), a_ref=a, b_ref=b, run_id=run.id, user_id=principal.user.id)
+        db.add(row)
+    row.decision, row.reason, row.run_id, row.user_id, row.created_at = (
+        body.decision,
+        body.reason,
+        run.id,
+        principal.user.id,
+        utcnow(),
+    )
+    audit.append(
+        db,
+        actor_id=principal.user.id,
+        actor_role=principal.role,
+        action=f"merge.{body.decision}",
+        target_kind="cluster_pair",
+        target_ref=f"{a}|{b}",
+        payload={"run_id": run.id, "reason": body.reason},
+    )
+    db.commit()
+    return MergeDecisionOut.model_validate(row)
+
+
+@router.get("/merge-decisions")
+def list_merge_decisions(
+    principal: Annotated[Principal, require(Action.VIEW)],
+    db: ReadDB,
+    limit: Limit = 50,
+    cursor: Cursor = None,
+) -> Page[MergeDecisionOut]:
+    stmt = select(MergeDecision)
+    after = decode_cursor(cursor, (str, str))
+    if after is not None:
+        at = cursor_time(after[0])
+        stmt = stmt.where(
+            or_(
+                MergeDecision.created_at < at,
+                and_(MergeDecision.created_at == at, MergeDecision.id < after[1]),
+            )
+        )
+    rows = list(
+        db.scalars(stmt.order_by(MergeDecision.created_at.desc(), MergeDecision.id.desc()).limit(limit + 1))
+    )
+    more, rows = len(rows) > limit, rows[:limit]
+    next_cursor = encode_cursor([rows[-1].created_at.isoformat(), rows[-1].id]) if more else None
+    return Page[MergeDecisionOut](
+        items=[MergeDecisionOut.model_validate(r) for r in rows], next_cursor=next_cursor
+    )
