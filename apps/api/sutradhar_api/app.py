@@ -27,7 +27,7 @@ from sutradhar_api.jobs.worker import Worker
 from sutradhar_api.middleware import BodySizeLimit, RateLimit, SecurityHeaders
 from sutradhar_api.models import User
 from sutradhar_api.ratelimit import RateLimiter
-from sutradhar_api.routes import auth, datasets, jobs, runs, system, triage, watchlists
+from sutradhar_api.routes import auth, cases, datasets, jobs, objects, runs, system, triage, watchlists
 from sutradhar_schemas.enums import AppMode, Role
 from sutradhar_schemas.ids import new_id
 
@@ -150,6 +150,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         jobs.router,
         watchlists.router,
         triage.router,
+        objects.router,
+        cases.router,
     ):
         app.include_router(router)
     app.mount("/api/static", StaticFiles(directory=STATIC), name="static")
