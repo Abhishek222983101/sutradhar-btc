@@ -92,7 +92,7 @@ class Worker:
         return {k: v for k, v in os.environ.items() if k.upper() not in drop}
 
     def _supervise(self, job: Claim, stop: threading.Event) -> Outcome:
-        proc = subprocess.Popen(  # nosec B603  # noqa: S603 - fixed argv, no shell
+        proc = subprocess.Popen(  # nosec B603
             [sys.executable, "-m", "sutradhar_api.jobs.child"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
