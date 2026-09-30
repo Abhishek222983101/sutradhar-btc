@@ -257,3 +257,53 @@ class Ledger:
             tags=dict(tags),
         )
         return self._commit(tx)
+
+    def coinjoin(
+        self,
+        participants: list[tuple[Wallet, Utxo]],
+        denomination: int,
+        ts_us: int,
+        feerate: float,
+        *,
+        kind: str,
+        coordinator: str,
+        origin_node: int | None,
+        op_id: str,
+        **tags: Any,
+    ) -> Tx | None:
+        """One equal-output mixing transaction: each participant brings one coin and leaves with one
+        `denomination` output plus their own change; the fee is split equally. Output order is shuffled."""
+        n = len(participants)
+        if n < 3:
+            return None
+        scripts_in = [u.script for _, u in participants]
+        out_scripts = [w.script for w, _ in participants] * 2
+        fee_share = math.ceil(feerate * estimate_vsize(scripts_in, out_scripts) / n)
+        outputs: list[TxOut] = []
+        for wallet, utxo in participants:
+            change = utxo.sats - denomination - fee_share
+            if change < 0:
+                return None
+            outputs.append(self._out(self.new_address(wallet, allow_reuse=False), denomination))
+            if change > DUST_SATS:
+                outputs.append(
+                    self._out(self.new_address(wallet, allow_reuse=False, change=True), change, change=True)
+                )
+        order = self.rng.permutation(len(outputs))
+        outputs = [outputs[int(i)] for i in order]
+        total_in = sum(u.sats for _, u in participants)
+        fee = total_in - sum(o.sats for o in outputs)
+        tx = Tx(
+            self.new_txid(),
+            ts_us,
+            sorted((u for _, u in participants), key=lambda u: (u.txid, u.vout)),
+            outputs,
+            fee,
+            estimate_vsize(scripts_in, [o.script for o in outputs]),
+            kind,
+            sender_agent=coordinator,
+            origin_node=origin_node,
+            op_id=op_id,
+            tags=dict(tags),
+        )
+        return self._commit(tx)

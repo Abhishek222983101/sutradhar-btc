@@ -14,6 +14,7 @@ from sutradhar_engine.settings import EngineSettings
 from sutradhar_engine.stages import (
     e01_load,
     e02_enrich,
+    e04_coinjoin,
     e05_cluster,
     e07_peel,
     e08_anomaly,
@@ -29,6 +30,7 @@ from sutradhar_schemas.ids import check_id
 DEFAULT_STAGES: tuple[Stage, ...] = (
     e01_load.STAGE,
     e02_enrich.STAGE,
+    e04_coinjoin.STAGE,
     e05_cluster.STAGE,
     e07_peel.STAGE,
     e08_anomaly.STAGE,

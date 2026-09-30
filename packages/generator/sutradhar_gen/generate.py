@@ -19,7 +19,7 @@ from sutradhar_gen.config import ScenarioConfig
 from sutradhar_gen.export import write_canonical_csv, write_parquet
 from sutradhar_gen.network import Topology, build_topology
 from sutradhar_gen.observe import ObservationLog, VantageObserver, origin_observable
-from sutradhar_gen.ops import RansomwareState, setup_ransomware
+from sutradhar_gen.ops import DarknetState, RansomwareState, setup_coinjoin, setup_darknet, setup_ransomware
 from sutradhar_gen.propagate import build_edges, propagate
 from sutradhar_gen.world import World
 
@@ -28,7 +28,10 @@ def generate(cfg: ScenarioConfig, seed: int, out: Path) -> dict[str, Any]:
     world = World(cfg, seed)
     exchanges = setup_exchanges(world)
     users = setup_users(world, exchanges)
-    ops = [setup_ransomware(world, rc, users, exchanges) for rc in cfg.ops.ransomware]
+    ops: list = [setup_ransomware(world, rc, users, exchanges) for rc in cfg.ops.ransomware]
+    ops += [setup_darknet(world, dc, users, exchanges) for dc in cfg.ops.darknet]
+    for cc in cfg.ops.coinjoin:
+        setup_coinjoin(world, cc, users)
     topo = build_topology(world)
     world.run()
 
@@ -69,10 +72,14 @@ def generate(cfg: ScenarioConfig, seed: int, out: Path) -> dict[str, Any]:
     return summary
 
 
-def _write_watchlist(path: Path, ops: list[RansomwareState]) -> None:
+def _write_watchlist(path: Path, ops: list[RansomwareState | DarknetState]) -> None:
     """Hand the system only part of what is known: the first ransom address of each operation."""
     lines = ["address,category,source,confidence"]
     for state in ops:
+        if isinstance(state, DarknetState):
+            if state.escrow_first:
+                lines.append(f"{state.escrow_first},darknet,market seizure,0.9")
+            continue
         if state.ransom_utxos:
             first = sorted(state.ransom_utxos, key=lambda u: u.created_us)[0]
             lines.append(f"{first.address},ransomware,victim report,0.95")

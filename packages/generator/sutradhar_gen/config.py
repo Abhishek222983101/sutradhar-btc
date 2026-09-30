@@ -82,8 +82,34 @@ class RansomwareCfg(_Cfg):
     peel_fraction: Range = Range(lo=0.03, hi=0.15)
 
 
+class CoinJoinCfg(_Cfg):
+    """A Whirlpool-style coordinator: each round mixes equal-valued outputs for several participants."""
+
+    op_id: str = "whirlpool"
+    rounds: int = Field(default=6, ge=1, le=500)
+    participants_min: int = Field(default=5, ge=3, le=60)
+    participants_max: int = Field(default=8, ge=3, le=60)
+    denomination_btc: float = Field(default=0.05, gt=0)
+    first_round_day: float = Field(default=1.2, ge=0)
+    interval_h: float = Field(default=10.0, gt=0)
+
+
+class DarknetCfg(_Cfg):
+    """A darknet market: buyers pay escrow addresses, the market consolidates and pays vendors in batches."""
+
+    op_id: str = "bazaar"
+    buyers: int = Field(default=10, ge=1, le=500)
+    vendors: int = Field(default=3, ge=1, le=50)
+    price_btc: Range = Range(lo=0.01, hi=0.06)
+    start_day: float = Field(default=1.3, ge=0)
+    payout_after_h: float = Field(default=14.0, gt=0)
+    cashout_after_h: float = Field(default=3.0, gt=0)
+
+
 class OpsCfg(_Cfg):
     ransomware: tuple[RansomwareCfg, ...] = (RansomwareCfg(),)
+    coinjoin: tuple[CoinJoinCfg, ...] = ()
+    darknet: tuple[DarknetCfg, ...] = ()
 
 
 class NetworkCfg(_Cfg):
@@ -121,6 +147,14 @@ class ScenarioConfig(_Cfg):
 
 
 PRESETS: dict[str, ScenarioConfig] = {
+    "rich": ScenarioConfig(
+        name="rich",
+        description="Ransomware, a CoinJoin coordinator and a darknet market on a busier economy, public-looking IPs.",
+        time=TimeCfg(days=5.0, warmup_days=1.0),
+        economy=EconomyCfg(users=160, user_tx_per_day=1.2),
+        ops=OpsCfg(coinjoin=(CoinJoinCfg(),), darknet=(DarknetCfg(),)),
+        network=NetworkCfg(ip_space="realistic"),
+    ),
     "demo": ScenarioConfig(
         name="demo",
         description="The tiny world with public-looking IPs from an open GeoIP database, for the live demo.",

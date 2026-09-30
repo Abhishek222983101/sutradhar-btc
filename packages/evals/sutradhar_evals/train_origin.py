@@ -26,7 +26,7 @@ TRAIN_SEEDS = tuple(range(100, 120))
 
 def _world_rows(seed: int, tmp: Path) -> pl.DataFrame:
     world = tmp / f"w{seed}"
-    generate(PRESETS["demo"], seed, world)
+    generate(PRESETS["rich" if seed % 2 else "demo"], seed, world)
     ingest([world / "data" / "traffic.csv"], CANONICAL_CSV, world / "ds", f"ds_train_{seed}")
     con = duckdb.connect()
     con.execute(f"ATTACH '{(world / 'ds' / 'dataset.duckdb').as_posix()}' AS ds (READ_ONLY)")

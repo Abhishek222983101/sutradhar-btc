@@ -13,7 +13,7 @@ DOCS = Path(__file__).resolve().parents[3] / "docs"
 SEEDS = (1, 2, 3, 4, 5)
 
 
-def main(scenario: str = "demo", out_dir: Path = DOCS, seeds: tuple[int, ...] = SEEDS) -> dict:
+def main(scenario: str = "rich", out_dir: Path = DOCS, seeds: tuple[int, ...] = SEEDS) -> dict:
     import tempfile
 
     reports = []
@@ -24,6 +24,7 @@ def main(scenario: str = "demo", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
     top3 = [r.origin.top3_accuracy for r in reports]
     baseline = [r.origin.random_baseline for r in reports]
     purity = [r.cluster.purity for r in reports]
+    cj = [r.coinjoin for r in reports if r.coinjoin.truth_coinjoins]
     summary = {
         "scenario": scenario,
         "seeds": list(seeds),
@@ -34,6 +35,12 @@ def main(scenario: str = "demo", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
         "origin_random_baseline_mean": round(statistics.mean(baseline), 4),
         "wallet_cluster_purity_mean": round(statistics.mean(purity), 4),
         "observable_transactions_total": sum(r.origin.observable_transactions for r in reports),
+        "coinjoin_precision_mean": round(statistics.mean(c.precision for c in cj), 4) if cj else None,
+        "coinjoin_recall_mean": round(statistics.mean(c.recall for c in cj), 4) if cj else None,
+        "coinjoins_evaluated": sum(c.truth_coinjoins for c in cj),
+        "purity_if_coinjoins_merged_mean": round(
+            statistics.mean(r.purity_if_coinjoins_merged for r in reports), 4
+        ),
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "EVAL.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -50,6 +57,13 @@ def main(scenario: str = "demo", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
         f"| Random-guess baseline (informational) | {summary['origin_random_baseline_mean']:.1%} |",
         f"| Wallet cluster purity vs. hidden truth | **{summary['wallet_cluster_purity_mean']:.1%}** |",
         f"| Observable transactions evaluated | {summary['observable_transactions_total']} |",
+    ]
+    if summary["coinjoins_evaluated"]:
+        lines += [
+            f"| CoinJoin detection precision / recall | **{summary['coinjoin_precision_mean']:.1%}** / **{summary['coinjoin_recall_mean']:.1%}** ({summary['coinjoins_evaluated']} CoinJoins) |",
+            f"| Cluster purity if CoinJoins were merged (ablation) | {summary['purity_if_coinjoins_merged_mean']:.1%} |",
+        ]
+    lines += [
         "",
         "## Per-seed detail",
         "",
@@ -64,7 +78,7 @@ def main(scenario: str = "demo", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
     lines.append("")
     (out_dir / "EVAL.md").write_text("\n".join(lines), encoding="utf-8")
     api_copy = DOCS.parent / "apps/api/sutradhar_api/demo/eval.json"
-    if api_copy.parent.exists():
+    if out_dir == DOCS and api_copy.parent.exists():
         api_copy.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return summary
 

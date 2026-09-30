@@ -23,7 +23,18 @@ US_PER_S = 1_000_000
 US_PER_H = 3_600 * US_PER_S
 US_PER_DAY = 24 * US_PER_H
 
-STREAMS = ("ledger", "agents", "ops", "fees", "network", "propagation", "observation", "export")
+STREAMS = (
+    "ledger",
+    "agents",
+    "ops",
+    "fees",
+    "network",
+    "propagation",
+    "observation",
+    "export",
+    "coinjoin",
+    "darknet",
+)
 
 
 @dataclass(slots=True)

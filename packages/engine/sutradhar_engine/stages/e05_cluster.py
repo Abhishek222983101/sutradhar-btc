@@ -8,14 +8,8 @@ from __future__ import annotations
 
 from sutradhar_engine.runner import RunContext, StageReport
 
-CJ_MIN_INPUTS = 3
-CJ_MIN_EQUAL_OUTPUTS = 3
-
-TXS_SQL = """
-SELECT i.txid, list(i.address ORDER BY i.idx) AS addrs,
-       (SELECT max(c) FROM (SELECT count(*) c FROM ds.txout o WHERE o.txid = i.txid GROUP BY o.sats)) AS equal_outs
-FROM ds.txin i GROUP BY i.txid
-"""
+TXS_SQL = "SELECT i.txid, list(i.address ORDER BY i.idx) AS addrs FROM ds.txin i GROUP BY i.txid"
+CJ_SQL = "SELECT txid FROM coinjoin WHERE p >= ?"
 
 
 class _UnionFind:
@@ -38,16 +32,17 @@ class _UnionFind:
 class ClusterStage:
     code = "E05"
     name = "wallet clustering"
-    requires = ("d_tx",)
+    requires = ("coinjoin",)
     produces = ("cluster",)
 
     def run(self, ctx: RunContext) -> StageReport:
         con = ctx.con
         uf, skipped = _UnionFind(), 0
-        for _txid, addrs, equal_outs in con.execute(TXS_SQL).fetchall():
+        flagged = {r[0] for r in con.execute(CJ_SQL, [ctx.settings.coinjoin_min_p]).fetchall()}
+        for txid, addrs in con.execute(TXS_SQL).fetchall():
             for a in addrs:
                 uf.find(a)
-            if len(addrs) >= CJ_MIN_INPUTS and (equal_outs or 0) >= CJ_MIN_EQUAL_OUTPUTS:
+            if txid in flagged:  # I8: never merge the inputs of a CoinJoin
                 skipped += 1
                 continue
             for a in addrs[1:]:

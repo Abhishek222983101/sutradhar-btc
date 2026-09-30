@@ -299,7 +299,7 @@ app.add_typer(evals_app, name="evals")
 
 @evals_app.command("report")
 def evals_report(
-    scenario: Annotated[str, typer.Option(help="Scenario to evaluate.")] = "demo",
+    scenario: Annotated[str, typer.Option(help="Scenario to evaluate.")] = "rich",
     seeds: Annotated[str, typer.Option(help="Comma-separated seeds.")] = "1,2,3,4,5",
     out: Annotated[Path, typer.Option(help="Where to write EVAL.json/EVAL.md.")] = Path("docs"),
 ) -> None:
@@ -309,7 +309,7 @@ def evals_report(
     seed_list = tuple(int(s) for s in seeds.split(","))
     summary = run_report(scenario, out, seed_list)
     typer.echo(
-        f"origin top-1 {summary['origin_top1_mean']:.1%} (baseline {summary['origin_random_baseline_mean']:.1%}), "
+        f"[{scenario}] origin top-1 {summary['origin_top1_mean']:.1%} (baseline {summary['origin_random_baseline_mean']:.1%}), "
         f"top-3 {summary['origin_top3_mean']:.1%}, cluster purity {summary['wallet_cluster_purity_mean']:.1%} "
         f"-> {out / 'EVAL.json'}"
     )

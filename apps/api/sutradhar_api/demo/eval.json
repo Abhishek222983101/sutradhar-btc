@@ -1,97 +1,136 @@
 {
-  "observable_transactions_total": 332,
-  "origin_random_baseline_mean": 0.0451,
-  "origin_top1_mean": 0.3979,
-  "origin_top1_stdev": 0.0304,
-  "origin_top3_mean": 0.5134,
+  "coinjoin_precision_mean": 1.0,
+  "coinjoin_recall_mean": 1.0,
+  "coinjoins_evaluated": 30,
+  "observable_transactions_total": 1421,
+  "origin_random_baseline_mean": 0.0438,
+  "origin_top1_mean": 0.407,
+  "origin_top1_stdev": 0.036,
+  "origin_top3_mean": 0.5301,
+  "purity_if_coinjoins_merged_mean": 0.9919,
   "runs": [
     {
       "cluster": {
         "addresses_in_impure": 0,
-        "clusters": 208,
-        "pure_clusters": 208,
+        "clusters": 779,
+        "pure_clusters": 779,
         "purity": 1.0
       },
-      "origin": {
-        "observable_transactions": 54,
-        "random_baseline": 0.0458,
-        "top1_accuracy": 0.3889,
-        "top3_accuracy": 0.5,
-        "total_transactions": 217
+      "coinjoin": {
+        "flagged": 6,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_coinjoins": 6
       },
-      "scenario": "demo",
+      "origin": {
+        "observable_transactions": 281,
+        "random_baseline": 0.044,
+        "top1_accuracy": 0.3843,
+        "top3_accuracy": 0.5231,
+        "total_transactions": 767
+      },
+      "purity_if_coinjoins_merged": 0.9919,
+      "scenario": "rich",
       "seed": 1
     },
     {
       "cluster": {
         "addresses_in_impure": 0,
-        "clusters": 216,
-        "pure_clusters": 216,
+        "clusters": 745,
+        "pure_clusters": 745,
         "purity": 1.0
       },
-      "origin": {
-        "observable_transactions": 73,
-        "random_baseline": 0.0451,
-        "top1_accuracy": 0.3425,
-        "top3_accuracy": 0.4384,
-        "total_transactions": 224
+      "coinjoin": {
+        "flagged": 6,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_coinjoins": 6
       },
-      "scenario": "demo",
+      "origin": {
+        "observable_transactions": 265,
+        "random_baseline": 0.0436,
+        "top1_accuracy": 0.3887,
+        "top3_accuracy": 0.5057,
+        "total_transactions": 732
+      },
+      "purity_if_coinjoins_merged": 0.9915,
+      "scenario": "rich",
       "seed": 2
     },
     {
       "cluster": {
         "addresses_in_impure": 0,
-        "clusters": 229,
-        "pure_clusters": 229,
+        "clusters": 787,
+        "pure_clusters": 787,
         "purity": 1.0
       },
-      "origin": {
-        "observable_transactions": 82,
-        "random_baseline": 0.0446,
-        "top1_accuracy": 0.4146,
-        "top3_accuracy": 0.5,
-        "total_transactions": 237
+      "coinjoin": {
+        "flagged": 6,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_coinjoins": 6
       },
-      "scenario": "demo",
+      "origin": {
+        "observable_transactions": 324,
+        "random_baseline": 0.0431,
+        "top1_accuracy": 0.4228,
+        "top3_accuracy": 0.5494,
+        "total_transactions": 767
+      },
+      "purity_if_coinjoins_merged": 0.992,
+      "scenario": "rich",
       "seed": 3
     },
     {
       "cluster": {
         "addresses_in_impure": 0,
-        "clusters": 186,
-        "pure_clusters": 186,
+        "clusters": 771,
+        "pure_clusters": 771,
         "purity": 1.0
       },
-      "origin": {
-        "observable_transactions": 75,
-        "random_baseline": 0.0446,
-        "top1_accuracy": 0.4267,
-        "top3_accuracy": 0.5867,
-        "total_transactions": 191
+      "coinjoin": {
+        "flagged": 6,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_coinjoins": 6
       },
-      "scenario": "demo",
+      "origin": {
+        "observable_transactions": 268,
+        "random_baseline": 0.044,
+        "top1_accuracy": 0.3694,
+        "top3_accuracy": 0.5,
+        "total_transactions": 761
+      },
+      "purity_if_coinjoins_merged": 0.9919,
+      "scenario": "rich",
       "seed": 4
     },
     {
       "cluster": {
         "addresses_in_impure": 0,
-        "clusters": 189,
-        "pure_clusters": 189,
+        "clusters": 806,
+        "pure_clusters": 806,
         "purity": 1.0
       },
-      "origin": {
-        "observable_transactions": 48,
-        "random_baseline": 0.0456,
-        "top1_accuracy": 0.4167,
-        "top3_accuracy": 0.5417,
-        "total_transactions": 194
+      "coinjoin": {
+        "flagged": 6,
+        "precision": 1.0,
+        "recall": 1.0,
+        "truth_coinjoins": 6
       },
-      "scenario": "demo",
+      "origin": {
+        "observable_transactions": 283,
+        "random_baseline": 0.0444,
+        "top1_accuracy": 0.47,
+        "top3_accuracy": 0.5724,
+        "total_transactions": 795
+      },
+      "purity_if_coinjoins_merged": 0.9922,
+      "scenario": "rich",
       "seed": 5
     }
   ],
-  "scenario": "demo",
+  "scenario": "rich",
   "seeds": [
     1,
     2,

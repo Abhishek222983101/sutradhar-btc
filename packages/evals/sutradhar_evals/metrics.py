@@ -103,11 +103,64 @@ def cluster_purity(world: WorldRun) -> ClusterMetrics:
 
 
 @dataclass(frozen=True)
+class CoinJoinMetrics:
+    truth_coinjoins: int
+    flagged: int
+    precision: float
+    recall: float
+
+
+def coinjoin_detection(world: WorldRun, min_p: float = 0.5) -> CoinJoinMetrics:
+    truth = pl.read_parquet(world.world_dir / "truth" / "txs.parquet").filter(pl.col("exported"))
+    actual = set(truth.filter(pl.col("kind") == "coinjoin")["txid"].to_list())
+    con = duckdb.connect(str(world.run_dir / "run.duckdb"), read_only=True)
+    flagged = {r[0] for r in con.execute("SELECT txid FROM coinjoin WHERE p >= ?", [min_p]).fetchall()}
+    con.close()
+    tp = len(actual & flagged)
+    return CoinJoinMetrics(
+        len(actual),
+        len(flagged),
+        round(tp / len(flagged), 4) if flagged else 1.0,
+        round(tp / len(actual), 4) if actual else 1.0,
+    )
+
+
+def purity_without_guard(world: WorldRun) -> float:
+    """Ablation: cluster purity if CoinJoin inputs WERE merged (what the I8 guard prevents)."""
+    addr = pl.read_parquet(world.world_dir / "truth" / "addresses.parquet").select("address", "agent_id")
+    con = duckdb.connect(str(world.run_dir / "run.duckdb"), read_only=True)
+    con.execute(f"ATTACH '{(world.dataset_dir / 'dataset.duckdb').as_posix()}' AS ds (READ_ONLY)")
+    rows = con.execute("SELECT list(address) FROM ds.txin GROUP BY txid").fetchall()
+    con.close()
+    parent: dict[str, str] = {}
+
+    def find(x: str) -> str:
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for (addrs,) in rows:
+        for a in addrs[1:]:
+            parent[find(a)] = find(addrs[0])
+        find(addrs[0])
+    owner = dict(zip(addr["address"].to_list(), addr["agent_id"].to_list(), strict=True))
+    members: dict[str, set[str]] = {}
+    for a in parent:
+        members.setdefault(find(a), set()).add(owner.get(a, a))
+    pure = sum(1 for v in members.values() if len(v) == 1)
+    return round(pure / len(members), 4) if members else 0.0
+
+
+@dataclass(frozen=True)
 class EvalReport:
     scenario: str
     seed: int
     origin: OriginMetrics
     cluster: ClusterMetrics
+    coinjoin: CoinJoinMetrics
+    purity_if_coinjoins_merged: float
 
     def to_dict(self) -> dict:
         return {
@@ -115,9 +168,18 @@ class EvalReport:
             "seed": self.seed,
             "origin": asdict(self.origin),
             "cluster": asdict(self.cluster),
+            "coinjoin": asdict(self.coinjoin),
+            "purity_if_coinjoins_merged": self.purity_if_coinjoins_merged,
         }
 
 
 def evaluate(cfg: ScenarioConfig, seed: int, out: Path) -> EvalReport:
     world = build_world(cfg, seed, out)
-    return EvalReport(cfg.name, seed, origin_accuracy(world), cluster_purity(world))
+    return EvalReport(
+        cfg.name,
+        seed,
+        origin_accuracy(world),
+        cluster_purity(world),
+        coinjoin_detection(world),
+        purity_without_guard(world),
+    )
