@@ -16,21 +16,21 @@ Legend: ✅ done · 🟡 done with a known gap
 | P0.6 Web | ✅ | landing with live requirement board, console, sign-in (non-demo), Vitest tests |
 | P0.7 Deploy | ✅ | Vercel (web), Render free tier (API), keep-alive workflow |
 | P0.8 Offline | ✅ | `sutradhar selftest`, `compose.airgap.yaml` (no-egress backend), CI job with `--network none` |
-| P1.1 Economy, wallets | 🟡 | ledger, exchanges, users; fewer coin-selection strategies than planned |
-| P1.2 Benign agents | 🟡 | users and exchange sweeps/batches; no merchants, pools, payroll |
+| P1.1 Economy, wallets | ✅ | ledger, exchanges, users; coin selection is now a per-scenario choice (`economy.coin_selection`: largest-first / fifo / random), default unchanged so every existing world stays byte-identical |
+| P1.2 Benign agents | ✅ | merchants, payroll and traders were already built (P5); added pool (periodic block-reward inflow, proportional payout fan-out) and gambling (dense bet-in/payout-out) — all five agent types the module docstring promised now exist |
 | P1.3 CoinJoin | ✅ | Whirlpool-style equal-output rounds (one denomination) |
 | P1.4 Illicit operations | ✅ | ransomware with peeling chain, darknet market with vendors |
 | P1.5 P2P propagation | ✅ | Bitcoin-style diffusion delays |
-| P1.6 Observation models | 🟡 | sensor (vantage) model only; flow-record model is detected but not generated |
-| P1.7 Truth and exporters | 🟡 | CSV + parquet truth; JSON/NDJSON/XML produced in tests, not by `gen run` |
-| P1.8 Scenario packs | 🟡 | `tiny`, `demo`, `rich`; no randomised scenario distribution or realism report |
+| P1.6 Observation models | 🟡 | sensor (vantage) model only; flow-record model is detected but not generated — a genuinely different simulation (ISP-level flow between arbitrary peer pairs, not sensor listen-points), left for a dedicated pass |
+| P1.7 Truth and exporters | ✅ | `gen run --format {csv,json,ndjson,xml}`; all four proven byte-identical after ingest (`test_export_formats.py`) |
+| P1.8 Scenario packs | 🟡 | `tiny`, `demo`, `rich`, `hard`; no randomised scenario distribution or realism report — left for a dedicated pass |
 | P2.1 Readers | ✅ | CSV, TSV, JSON, NDJSON, XML (entity-safe); compressed input not supported |
 | P2.2 Mapping, auto-mapper | ✅ | built-in profiles per format; `--auto-map` with per-field confidence |
 | P2.3 Normalisation | ✅ | exact amounts and times |
 | P2.4 Validation, rejects | ✅ | rule-tagged rejects, conflict quarantine, rejects API and view |
 | P2.5 X-ray | ✅ | capability profile and console panel |
 | P2.6 Enrichment | ✅ | GeoIP country and ASN with provenance |
-| P2.7 Reference data | 🟡 | manifest, checksums, refresh script, API; only DB-IP (no Tor or VPN lists) |
+| P2.7 Reference data | ✅ | manifest, checksums, refresh script, API; added `anon-ranges.txt` (Tor-exit/public-VPN CIDR matching, tagged in `ip_geo.note`) + `scripts/fetch_anon_ranges.py` — ships empty (I1: the product never fetches at runtime), a maintainer refreshes it online, same pattern as DB-IP |
 | P2.8 Ingest API and UI | ✅ | multi-format upload, progress, X-ray, rejects |
 | P3.1 Value flows | ✅ | cluster-to-cluster flow graph |
 | P3.2 CoinJoin | 🟡 | scored rule, not a trained classifier; tested on our clean mixes |

@@ -158,6 +158,17 @@ class Ledger:
         script = self.wallets[owner].script if owner else ScriptType.P2WPKH
         return TxOut(address, sats, script, owner, change)
 
+    def _ordered_candidates(self, wallet: Wallet, strategy: str) -> list[Utxo]:
+        utxos = list(wallet.utxos.values())
+        if strategy == "largest_first":
+            return sorted(utxos, key=lambda u: (-u.sats, u.txid, u.vout))
+        if strategy == "fifo":
+            return sorted(utxos, key=lambda u: (u.created_us, u.txid, u.vout))
+        if strategy == "random":
+            order = self.rng.permutation(len(utxos))
+            return [utxos[int(i)] for i in order]
+        raise ValueError(f"unknown coin selection strategy {strategy!r}")
+
     def coinbase(self, to_address: str, sats: int, ts_us: int, *, kind: str = "coinbase", **tags: Any) -> Tx:
         tx = Tx(self.new_txid(), ts_us, [], [self._out(to_address, sats)], 0, 0, kind, tags=dict(tags))
         tx.vsize = estimate_vsize([], [tx.outputs[0].script])
@@ -175,14 +186,21 @@ class Ledger:
         origin_node: int | None = None,
         op_id: str | None = None,
         inputs: list[Utxo] | None = None,
+        strategy: str = "largest_first",
         **tags: Any,
     ) -> Tx:
-        """Pay `payments` from `wallet` (largest-first selection unless `inputs` is fixed), change back."""
+        """Pay `payments` from `wallet` (coin selection per `strategy`, unless `inputs` is fixed), change back.
+
+        `strategy` (P1.1): "largest_first" (default — fewest inputs, the prior fixed behaviour, unchanged for
+        every caller that does not pass one), "fifo" (oldest UTXO first, the pattern real "coin control"-naive
+        wallets fall into and a paper trail an analyst can follow hop by hop), or "random" (shuffled — closer to
+        what a privacy-conscious wallet's naive-random selector does, no consistent bias for detectors to learn).
+        """
         if not payments or any(sats <= DUST_SATS for _, sats in payments):
             raise ValueError("payments must be non-empty and above dust")
         out_scripts = [self._out(addr, sats).script for addr, sats in payments]
         target = sum(sats for _, sats in payments)
-        candidates = sorted(wallet.utxos.values(), key=lambda u: (-u.sats, u.txid, u.vout))
+        candidates = self._ordered_candidates(wallet, strategy)
         chosen: list[Utxo] = list(inputs) if inputs is not None else []
         change_script = wallet.script
         while True:

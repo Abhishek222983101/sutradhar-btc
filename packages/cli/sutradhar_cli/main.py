@@ -67,6 +67,9 @@ def gen_run(
     scenario: Annotated[str, typer.Option(help="Preset scenario name.")] = "tiny",
     seed: Annotated[int, typer.Option(help="Seed; same scenario + seed gives byte-identical output.")] = 1,
     out: Annotated[Path, typer.Option(help="Output directory.")] = Path("worlds/tiny"),
+    fmt: Annotated[
+        str, typer.Option("--format", help="Output format for data/traffic.*: csv, json, ndjson or xml.")
+    ] = "csv",
 ) -> None:
     """Generate one world into OUT/data (what the system sees) and OUT/truth (evaluation only)."""
     from sutradhar_gen.config import PRESETS
@@ -74,7 +77,9 @@ def gen_run(
 
     if scenario not in PRESETS:
         raise typer.BadParameter(f"unknown scenario {scenario!r}; choose from {sorted(PRESETS)}")
-    summary = generate(PRESETS[scenario], seed, out)
+    if fmt not in {"csv", "json", "ndjson", "xml"}:
+        raise typer.BadParameter(f"unknown format {fmt!r}; choose from csv, json, ndjson, xml")
+    summary = generate(PRESETS[scenario], seed, out, fmt=fmt)
     counts = summary["counts"]
     typer.echo(
         f"{scenario} (seed {seed}): {counts['txs_exported']} transactions, "

@@ -15,6 +15,14 @@
       "license": "CC BY 4.0 (attribution: IP Geolocation by DB-IP, https://db-ip.com)",
       "sha256": "ab07c764a10c4f8c2f3539377fa86e5c928243084aafd359d1be4cb8543d7406",
       "bytes": 9511026
+    },
+    {
+      "file": "anon-ranges.txt",
+      "source": "maintainer-run scripts/fetch_anon_ranges.py (Tor Project bulk exit list + published public-VPN ranges); empty until refreshed",
+      "as_of": "unrefreshed",
+      "license": "varies by upstream source, see scripts/fetch_anon_ranges.py",
+      "sha256": "905cdfc89ede34b142e0e0c1a2f7d55d9397aaa66c338fc14f4ccd0c08f1b4d5",
+      "bytes": 388
     }
   ]
 }

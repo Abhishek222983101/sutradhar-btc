@@ -58,6 +58,7 @@ class EconomyCfg(_Cfg):
     exchange_start_btc: float = Field(default=400.0, gt=0)
     script_mix: dict[ScriptType, float] = DEFAULT_SCRIPT_MIX
     address_reuse: float = Field(default=0.10, ge=0, le=1)
+    coin_selection: Literal["largest_first", "fifo", "random"] = "largest_first"
     feerate_median_sat_vb: float = Field(default=12.0, gt=0)
     feerate_sigma: float = Field(default=0.6, ge=0)
     sweep_every_h: float = Field(default=6.0, gt=0)
@@ -117,6 +118,13 @@ class LookalikeCfg(_Cfg):
     payroll_every_h: float = Field(default=20.0, gt=0)
     traders: int = Field(default=0, ge=0, le=50)
     trader_interval_min: Range = Range(lo=45, hi=150)
+    pools: int = Field(default=0, ge=0, le=10)
+    pool_miners: int = Field(default=25, ge=2, le=500)
+    pool_block_every_h: float = Field(default=2.0, gt=0)
+    pool_payout_every_h: float = Field(default=24.0, gt=0)
+    gambling_sites: int = Field(default=0, ge=0, le=20)
+    gambling_bets_per_day: float = Field(default=90.0, gt=0)
+    gambling_house_edge: float = Field(default=0.02, ge=0, lt=1)
 
 
 class OpsCfg(_Cfg):

@@ -1,0 +1,4 @@
+# Known Tor-exit and public-VPN CIDR ranges, one per line, "#" comments allowed.
+# Empty by default: the product never fetches anything at runtime (I1). A maintainer populates this
+# file online with `uv run python scripts/fetch_anon_ranges.py`, reviews the diff, and commits it —
+# exactly the same maintainer-refresh pattern as the bundled DB-IP databases (scripts/fetch_refdata.py).

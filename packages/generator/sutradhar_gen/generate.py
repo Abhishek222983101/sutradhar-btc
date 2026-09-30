@@ -1,7 +1,8 @@
 """Generate a world: simulate the economy, propagate every transaction, record what sensors see, export.
 
 Output layout (blueprint §5.8):
-    <out>/data/traffic.csv      what the system sees (PS minimum fields + extras)
+    <out>/data/traffic.{csv,json,ndjson,xml}   what the system sees (PS minimum fields + extras); csv unless
+                                                `fmt` says otherwise — same content, same row order, any format
     <out>/data/watchlist.csv    partial seeds handed to the system
     <out>/truth/*.parquet       ground truth — only sutradhar_evals may read it (I7)
     <out>/world.json            scenario, seed, generator version, counts
@@ -16,7 +17,13 @@ from typing import Any
 from sutradhar_gen import __version__
 from sutradhar_gen.agents import ExchangeState, setup_exchanges, setup_users
 from sutradhar_gen.config import ScenarioConfig
-from sutradhar_gen.export import write_canonical_csv, write_parquet
+from sutradhar_gen.export import (
+    write_canonical_csv,
+    write_canonical_json,
+    write_canonical_ndjson,
+    write_canonical_xml,
+    write_parquet,
+)
 from sutradhar_gen.lookalikes import setup_lookalikes
 from sutradhar_gen.network import Topology, build_topology
 from sutradhar_gen.observe import ObservationLog, VantageObserver, origin_observable
@@ -24,8 +31,15 @@ from sutradhar_gen.ops import DarknetState, RansomwareState, setup_coinjoin, set
 from sutradhar_gen.propagate import build_edges, propagate
 from sutradhar_gen.world import World
 
+_WRITERS = {
+    "csv": (write_canonical_csv, "traffic.csv"),
+    "json": (write_canonical_json, "traffic.json"),
+    "ndjson": (write_canonical_ndjson, "traffic.ndjson"),
+    "xml": (write_canonical_xml, "traffic.xml"),
+}
 
-def generate(cfg: ScenarioConfig, seed: int, out: Path) -> dict[str, Any]:
+
+def generate(cfg: ScenarioConfig, seed: int, out: Path, fmt: str = "csv") -> dict[str, Any]:
     world = World(cfg, seed)
     exchanges = setup_exchanges(world)
     users = setup_users(world, exchanges)
@@ -33,8 +47,9 @@ def generate(cfg: ScenarioConfig, seed: int, out: Path) -> dict[str, Any]:
     ops += [setup_darknet(world, dc, users, exchanges) for dc in cfg.ops.darknet]
     for cc in cfg.ops.coinjoin:
         setup_coinjoin(world, cc, users)
-    if cfg.lookalikes.merchants or cfg.lookalikes.payroll_employers or cfg.lookalikes.traders:
-        setup_lookalikes(world, cfg.lookalikes, users)
+    lk = cfg.lookalikes
+    if lk.merchants or lk.payroll_employers or lk.traders or lk.pools or lk.gambling_sites:
+        setup_lookalikes(world, lk, users)
     topo = build_topology(world)
     world.run()
 
@@ -51,8 +66,11 @@ def generate(cfg: ScenarioConfig, seed: int, out: Path) -> dict[str, Any]:
         prop = propagate(edges, tx.origin_node, cfg.network, rng)  # type: ignore[arg-type]
         observer.observe(i, tx.ts_us, prop, log)
 
+    if fmt not in _WRITERS:
+        raise ValueError(f"unknown format {fmt!r}; choose from {sorted(_WRITERS)}")
+    writer, filename = _WRITERS[fmt]
     data_dir, truth_dir = out / "data", out / "truth"
-    rows = write_canonical_csv(data_dir / "traffic.csv", exported, log, topo.geo)
+    rows = writer(data_dir / filename, exported, log, topo.geo)
     _write_watchlist(data_dir / "watchlist.csv", ops)
     _write_truth(truth_dir, world, topo, exchanges, exported)
 

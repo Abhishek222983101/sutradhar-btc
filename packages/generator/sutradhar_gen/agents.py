@@ -150,6 +150,14 @@ def _user_action(world: World, agent: Agent, users: list[Agent]) -> None:
                 return
             to = world.ledger.new_address(world.ledger.wallets[peer.wallet_ids[0]])
             kind = "user_payment"
-        world.ledger.pay(wallet, [(to, amount)], world.now, feerate, kind=kind, origin_node=agent.node_id)
+        world.ledger.pay(
+            wallet,
+            [(to, amount)],
+            world.now,
+            feerate,
+            kind=kind,
+            origin_node=agent.node_id,
+            strategy=world.cfg.economy.coin_selection,
+        )
     except InsufficientFundsError:
         return
