@@ -61,7 +61,7 @@ def with_plugins(stages: Sequence[Stage]) -> tuple[Stage, ...]:
     extra = load_plugin_stages()
     core = list(stages)
     at = next((i for i, st in enumerate(core) if st.code == "E17"), len(core))
-    return tuple([*core[:at], *extra, *core[at:]])
+    return (*core[:at], *extra, *core[at:])
 
 
 def _sql_path(path: Path) -> str:
