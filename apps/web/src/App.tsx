@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { enterDemo, hasSession } from "./api";
+import { enterDemo, hasSession, publicGet, type Info } from "./api";
 import Console from "./Console";
 import Landing from "./Landing";
 
@@ -12,7 +12,10 @@ export default function App() {
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
-  useEffect(() => { if (page === "console" && !hasSession()) void enterDemo().catch(() => undefined); }, [page]);
+  useEffect(() => {
+    if (page !== "console" || hasSession()) return;
+    publicGet<Info>("/api/v1/system/info").then((i) => { if (i.mode === "demo") return enterDemo(); location.hash = "#/"; }).catch(() => undefined);
+  }, [page]);
   const go = () => { location.hash = "#/console"; };
   return (
     <>

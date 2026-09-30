@@ -1,7 +1,8 @@
 .git
 .venv
 **/node_modules
-apps/web
+apps/web/node_modules
+apps/web/dist
 worlds
 data
 demo-data

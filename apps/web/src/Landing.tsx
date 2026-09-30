@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { enterDemo, publicGet, type Eval, type Info } from "./api";
 import { LABEL, REQUIREMENTS } from "./requirements";
+import Login from "./Login";
 import Threads from "./Threads";
 
 const pc = (v: number) => `${Math.round(v * 1000) / 10}%`;
@@ -31,8 +32,12 @@ export default function Landing({ go }: { go: () => void }) {
               a ranked list of leads, each one with its evidence and its reasons.
             </p>
             <div className="cta">
-              <button className="btn primary" onClick={start} disabled={busy}>{busy ? "Opening…" : "Open the live demo"}</button>
-              <span className="note">No sign-up. Synthetic data only.</span>
+              {info && info.mode !== "demo" ? <Login done={go} /> : (
+                <>
+                  <button className="btn primary" onClick={start} disabled={busy}>{busy ? "Opening…" : "Open the live demo"}</button>
+                  <span className="note">No sign-up. Synthetic data only.</span>
+                </>
+              )}
             </div>
             {error && <p className="err" role="alert">{error}</p>}
             {up === false && <p className="err" role="alert">The demo server is waking up. Try again in a few seconds.</p>}

@@ -333,6 +333,15 @@ def evals_train_change() -> None:
     typer.echo(f"trained change-lr@1 on {info['rows']} outputs ({info['positives']} change outputs)")
 
 
+@app.command()
+def selftest() -> None:
+    """Check the whole system end to end with no network: generate, ingest, analyse, verify. Exit 1 on failure."""
+    from sutradhar_cli.selftest import run
+
+    if not run():
+        raise typer.Exit(1)
+
+
 audit_app = typer.Typer(help="The audit chain.", no_args_is_help=True)
 app.add_typer(audit_app, name="audit")
 

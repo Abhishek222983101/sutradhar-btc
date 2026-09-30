@@ -5,7 +5,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 COPY apps/api apps/api
 COPY packages packages
-RUN uv sync --frozen --no-dev --package sutradhar-api
+RUN uv sync --frozen --no-dev
 ENV APP_MODE=demo DATA_DIR=/data DATABASE_URL=sqlite:////data/app.sqlite EMBEDDED_WORKER=true
 RUN useradd -m app && mkdir /data && chown app /data
 USER app

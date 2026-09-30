@@ -23,6 +23,12 @@ export async function enterDemo(): Promise<void> {
   save(await r.json());
 }
 
+export async function login(email: string, password: string): Promise<void> {
+  const r = await fetch(`${BASE}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+  if (!r.ok) throw new Error(r.status === 429 ? "Too many attempts. Wait a few minutes." : "Email or password is incorrect.");
+  save(await r.json());
+}
+
 async function refresh(): Promise<boolean> {
   if (!session) return false;
   const r = await fetch(`${BASE}/api/v1/auth/refresh`, {
@@ -36,7 +42,7 @@ async function refresh(): Promise<boolean> {
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   let r = await raw(path, init);
-  if (r.status === 401 && (await refresh().catch(() => false) || (await enterDemo().then(() => true, () => false)))) r = await raw(path, init);
+  if (r.status === 401 && (await refresh().catch(() => false) || (session?.user.role === "demo" && (await enterDemo().then(() => true, () => false))))) r = await raw(path, init);
   if (!r.ok) {
     const p = await r.json().catch(() => ({}));
     throw new Error(p.detail || `request failed (${r.status})`);
