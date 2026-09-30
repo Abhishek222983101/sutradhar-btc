@@ -4,7 +4,9 @@ import DataPanel from "./DataPanel";
 import { btc, pct } from "./format";
 import LinkGraph from "./LinkGraph";
 import Canvas from "./Canvas";
+import Dossier from "./Dossier";
 import PipelinePanel from "./PipelinePanel";
+import SearchBox from "./SearchBox";
 
 const TYPES = ["ALL", "ACTOR", "CHAIN", "TX"] as const;
 const NAMES: Record<string, string> = { ACTOR: "Wallet", CHAIN: "Peel chain", TX: "Unusual tx" };
@@ -19,6 +21,7 @@ export default function Console({ home }: { home: () => void }) {
   const [loading, setLoading] = useState(true);
   const [datasetId, setDatasetId] = useState("ds_hero");
   const [runId, setRunId] = useState("run_hero");
+  const [dossier, setDossier] = useState<{ kind: string; ref: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -36,6 +39,19 @@ export default function Console({ home }: { home: () => void }) {
     <div className="wrap console">
       <div className="panel">
         <h2>Leads, most urgent first</h2>
+        <div style={{ padding: "10px 14px" }}>
+          <SearchBox
+            runId={runId}
+            onOpen={(kind, ref) => {
+              if (kind === "lead") {
+                const found = leads.find((l) => l.id === ref);
+                if (found) { setSel(found); setDossier(null); }
+              } else {
+                setDossier({ kind, ref });
+              }
+            }}
+          />
+        </div>
         <div className="chips" role="group" aria-label="Filter by type">
           {TYPES.map((t) => (
             <button key={t} className="chip" aria-pressed={type === t} onClick={() => setType(t)}>{t === "ALL" ? "All" : NAMES[t]}</button>
@@ -59,7 +75,13 @@ export default function Console({ home }: { home: () => void }) {
         <Upload onDone={(d, r) => { setDatasetId(d); setRunId(r); }} />
       </div>
       <div className="detail">
-        {sel ? <Detail lead={sel} runId={runId} /> : <div className="panel empty">Select a lead.</div>}
+        {dossier ? (
+          <Dossier runId={runId} kind={dossier.kind} ref={dossier.ref} close={() => setDossier(null)} />
+        ) : sel ? (
+          <Detail lead={sel} runId={runId} />
+        ) : (
+          <div className="panel empty">Select a lead, or search above.</div>
+        )}
         <PipelinePanel runId={runId} />
         <DataPanel datasetId={datasetId} />
         <p><a href="#/" onClick={home}>Back to the requirement board</a></p>
@@ -105,7 +127,7 @@ function Detail({ lead, runId }: { lead: Lead; runId: string }) {
               {lead.families.map((f) => <span className="fam" key={f}>{f}</span>)}
             </div>
             {lead.value_at_risk_sats > 0 && <div><b>{btc(lead.value_at_risk_sats)} BTC</b><div className="note">value involved</div></div>}
-            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <div className="lead-actions">
               {lead.subject_kind === "cluster" && <button className="chip" onClick={() => setShowCanvas((v) => !v)}>{showCanvas ? "Hide" : "Investigate"} graph</button>}
               <button className="chip" onClick={() => void addToCase()}>Add to case</button>
             </div>

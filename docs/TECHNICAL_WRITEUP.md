@@ -18,7 +18,7 @@ addresses into wallets, and (3) links an IP to a wallet when the IP keeps being 
 spends. Around that core it adds anomaly detection, peeling-chain and CoinJoin detection, risk propagation from seed
 wallets, and merge suggestions. All of it feeds one ranked lead list.
 
-The pipeline is a fixed sequence of stages (E01 to E19) over an immutable dataset store. Each stage declares the tables
+The pipeline is a fixed sequence of stages (E01 to E22) over an immutable dataset store. Each stage declares the tables
 it reads and writes, so the run is inspectable and a stage that breaks its contract fails the run. The same input
 produces the same result digest; this is checked in the selftest.
 
@@ -48,7 +48,10 @@ There is deliberately no deep model and no language model. On worlds this size t
 they cannot show their working.
 
 **Training and testing are separate.** The origin model trains on seeds 100 to 119 (a mix of two scenarios) and is
-evaluated on seeds 1 to 5, which it has never seen. The change model trains on seeds 200 to 215.
+evaluated on seeds 1 to 5, which it has never seen. The change model trains on seeds 200 to 215. The lead ranker
+trains on seeds 300 to 341, cycling through three scenarios (including `hard`, which adds benign look-alike
+actors — merchants, payroll, trading bots — as hard negatives) and is evaluated on the same unseen 1-to-5 range,
+both with and without watchlist seeds present.
 
 ## 4. Results, and what they mean
 
@@ -93,7 +96,9 @@ The compose stack puts the API on a network with no route to the internet. CI ru
   and messier wallets.
 * **Sensor model.** We assume a few listening sensors that log the first announcers. Flow-record style data (ISP-level
   captures) uses a different observation model that is detected but not yet exploited.
-* **Scores are not calibrated probabilities.** They are transparent evidence scores; the interface says so.
+* **Calibration is isotonic, not conformal.** ACTOR/CASHOUT/IP leads use the trained, isotonic-calibrated ranker
+  (ECE 0.002 on held-out data); CHAIN and TX leads still use a transparent rule-based score, which the interface
+  labels as such rather than presenting it as a probability.
 * **Clean CoinJoins.** Real mixes vary (multiple denominations, remixes); recall will be lower.
 * **Small worlds.** Hundreds of transactions, not millions. The engine is columnar and streaming, but we have not
   benchmarked at production scale.

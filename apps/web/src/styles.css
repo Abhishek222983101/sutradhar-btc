@@ -118,3 +118,32 @@ footer { border-top: var(--line); background: var(--card); padding: 18px 0; colo
   .stats { grid-template-columns: repeat(2, 1fr); }
   .leads { max-height: 40vh; }
 }
+
+/* Govern, cases, academy: tables, forms, key-value rows, score bars */
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.data-table th { text-align: left; padding: 8px 10px; border-bottom: 3px solid var(--ink); font-weight: 800; background: var(--ground); }
+.data-table td { padding: 7px 10px; border-bottom: 2px solid #e3e6ec; vertical-align: top; }
+.data-table tr:hover td { background: #fff6e8; }
+.data-table .num { font-family: "IBM Plex Mono", monospace; }
+
+.form-row { display: grid; gap: 4px; margin-bottom: 12px; }
+.form-row label { font-weight: 700; font-size: 14px; }
+.form-row input, .form-row textarea, .form-row select { border: 3px solid var(--ink); padding: 9px 10px; font-family: inherit; font-size: 15px; background: var(--card); }
+.form-row input:focus, .form-row textarea:focus, .form-row select:focus { outline: 3px solid var(--navy); outline-offset: 1px; }
+.form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.score-row { display: grid; grid-template-columns: 1fr auto 44px; gap: 10px; align-items: center; font-size: 14px; padding: 4px 0; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; }
+.kv dt { font-weight: 700; color: var(--mute); }
+.kv dd { margin: 0; }
+
+.small-note { font-size: 13px; color: var(--mute); margin: 4px 0 0; }
+
+fieldset legend { font-family: inherit; }
+input[type="radio"], input[type="checkbox"] { accent-color: var(--navy); width: 16px; height: 16px; vertical-align: middle; margin-right: 4px; }
+input[type="range"] { accent-color: var(--saffron); }
+.lead-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
