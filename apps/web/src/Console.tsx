@@ -3,6 +3,7 @@ import { api, type Evidence, type Lead } from "./api";
 import DataPanel from "./DataPanel";
 import { btc, pct } from "./format";
 import LinkGraph from "./LinkGraph";
+import Canvas from "./Canvas";
 import PipelinePanel from "./PipelinePanel";
 
 const TYPES = ["ALL", "ACTOR", "CHAIN", "TX"] as const;
@@ -58,7 +59,7 @@ export default function Console({ home }: { home: () => void }) {
         <Upload onDone={(d, r) => { setDatasetId(d); setRunId(r); }} />
       </div>
       <div className="detail">
-        {sel ? <Detail lead={sel} /> : <div className="panel empty">Select a lead.</div>}
+        {sel ? <Detail lead={sel} runId={runId} /> : <div className="panel empty">Select a lead.</div>}
         <PipelinePanel runId={runId} />
         <DataPanel datasetId={datasetId} />
         <p><a href="#/" onClick={home}>Back to the requirement board</a></p>
@@ -67,14 +68,32 @@ export default function Console({ home }: { home: () => void }) {
   );
 }
 
-function Detail({ lead }: { lead: Lead }) {
+type Explanation = { reasons: { family: string; feature: string; text: string; contribution: number }[]; opposing: { text: string }[]; counterfactual: { feature: string; p_after: number; p_before: number }[]; priority: Record<string, number> };
+
+function Detail({ lead, runId }: { lead: Lead; runId: string }) {
   const [full, setFull] = useState<Lead | null>(null);
   const [ev, setEv] = useState<Evidence | null>(null);
+  const [explain, setExplain] = useState<Explanation | null>(null);
+  const [showCanvas, setShowCanvas] = useState(false);
+  const [caseMsg, setCaseMsg] = useState("");
   useEffect(() => {
-    setFull(null); setEv(null);
+    setFull(null); setEv(null); setExplain(null); setShowCanvas(false); setCaseMsg("");
     void api<Lead>(`/api/v1/leads/${lead.id}`).then(setFull).catch(() => undefined);
+    void api<Explanation>(`/api/v1/leads/${lead.id}/explanation`).then(setExplain).catch(() => undefined);
     if (["cluster", "ip", "cashout"].includes(lead.subject_kind)) void api<Evidence>(`/api/v1/leads/${lead.id}/evidence`).then(setEv).catch(() => undefined);
   }, [lead.id, lead.subject_kind]);
+  const addToCase = async () => {
+    try {
+      const cases = await api<{ items: { id: string; title: string }[] }>("/api/v1/cases?limit=1");
+      let caseId = cases.items[0]?.id;
+      if (!caseId) {
+        const c = await api<{ id: string }>("/api/v1/cases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Working case" }) });
+        caseId = c.id;
+      }
+      await api(`/api/v1/cases/${caseId}/items`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ item_kind: "lead", ref: lead.id, run_id: runId }) });
+      setCaseMsg("Added to case — see the Cases tab.");
+    } catch (e) { setCaseMsg((e as Error).message); }
+  };
   return (
     <>
       <div className="panel">
@@ -86,7 +105,12 @@ function Detail({ lead }: { lead: Lead }) {
               {lead.families.map((f) => <span className="fam" key={f}>{f}</span>)}
             </div>
             {lead.value_at_risk_sats > 0 && <div><b>{btc(lead.value_at_risk_sats)} BTC</b><div className="note">value involved</div></div>}
+            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              {lead.subject_kind === "cluster" && <button className="chip" onClick={() => setShowCanvas((v) => !v)}>{showCanvas ? "Hide" : "Investigate"} graph</button>}
+              <button className="chip" onClick={() => void addToCase()}>Add to case</button>
+            </div>
           </div>
+          {caseMsg && <p className="note">{caseMsg}</p>}
           <p className="hedge">{lead.summary}</p>
           <div>
             <h3 style={{ fontSize: 17, marginBottom: 8 }}>Why this was flagged</h3>
@@ -96,9 +120,29 @@ function Detail({ lead }: { lead: Lead }) {
               ))}
             </ul>
           </div>
-          {!lead.calibrated && <p className="note">This score is a transparent evidence score, not a calibrated probability. Calibration against labelled data is planned.</p>}
+          {explain && explain.opposing.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: 17, marginBottom: 8 }}>Against this reading</h3>
+              <ul className="reasons">{explain.opposing.map((o, i) => <li key={i}>{o.text}</li>)}</ul>
+            </div>
+          )}
+          {explain && explain.counterfactual.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: 17, marginBottom: 8 }}>What would clear this</h3>
+              <ul className="reasons">
+                {explain.counterfactual.map((c, i) => (
+                  <li key={i}>If <span className="mono">{c.feature}</span> were typical, the score would move from {pct(c.p_before)} to {pct(c.p_after)}.</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {explain && Object.keys(explain.priority).length > 0 && (
+            <p className="note mono">priority = {Object.entries(explain.priority).map(([k, v]) => `${k} ${v}`).join(" × ")}</p>
+          )}
+          {!lead.calibrated && <p className="note">This score is a transparent evidence score, not a calibrated probability for TX/CHAIN leads; ACTOR/CASHOUT/IP leads use the calibrated model.</p>}
         </div>
       </div>
+      {showCanvas && lead.subject_kind === "cluster" && <Canvas runId={runId} clusterId={lead.id} />}
       {ev && <EvidencePanel ev={ev} />}
     </>
   );
