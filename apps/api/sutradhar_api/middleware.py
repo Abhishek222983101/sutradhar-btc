@@ -101,8 +101,13 @@ class BodySizeLimit:
         if scope["type"] != "http" or scope.get("method") in ("GET", "HEAD", "OPTIONS"):
             await self.app(scope, receive, send)
             return
-        is_upload = scope.get("path") == "/api/v1/datasets"
-        limit = self.upload_bytes() + 1024 * 1024 if is_upload else self.default_bytes
+        path = scope.get("path", "")
+        if path == "/api/v1/datasets":
+            limit = self.upload_bytes() + 1024 * 1024
+        elif path.endswith("/import"):
+            limit = 6 * 1024 * 1024  # watchlist CSV imports (the route enforces its own 5 MB cap)
+        else:
+            limit = self.default_bytes
         declared = dict(scope.get("headers") or []).get(b"content-length")
         if declared is not None and (not declared.isdigit() or int(declared) > limit):
             await _send_problem(send, 413, "too_large", f"request body limit is {limit} bytes", [])

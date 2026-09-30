@@ -35,9 +35,25 @@ def main(scenario: str = "rich", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
         "origin_ceiling_mean": round(statistics.mean(r.origin.ceiling for r in reports), 4),
         "origin_first_spy_mean": round(statistics.mean(r.origin.first_spy_top1 for r in reports), 4),
         "peel_precision_mean": round(statistics.mean(r.peel.precision for r in reports), 4),
+        "peel_lead_precision_mean": round(statistics.mean(r.peel.lead_precision for r in reports), 4),
         "peel_recall_mean": round(statistics.mean(r.peel.recall for r in reports), 4),
         "suggest_precision_mean": round(statistics.mean(r.suggest.precision_top50 for r in reports), 4),
         "suggest_random_rate_mean": round(statistics.mean(r.suggest.random_pair_rate for r in reports), 6),
+        **{
+            f"ranker_{variant}_{k}_mean": round(
+                statistics.mean(getattr(getattr(r, attr), k) for r in reports), 4
+            )
+            for variant, attr in (("seeded", "ranker"), ("blind", "ranker_blind"))
+            for k in (
+                "pr_auc",
+                "taint_only_pr_auc",
+                "r_precision",
+                "recall_at_20",
+                "ece",
+                "country_ablation_delta",
+                "prevalence",
+            )
+        },
         "origin_random_baseline_mean": round(statistics.mean(baseline), 4),
         "wallet_cluster_purity_mean": round(statistics.mean(purity), 4),
         "observable_transactions_total": sum(r.origin.observable_transactions for r in reports),
@@ -75,8 +91,14 @@ def main(scenario: str = "rich", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
             f"| Cluster purity if CoinJoins were merged (ablation) | {summary['purity_if_coinjoins_merged_mean']:.1%} |",
         ]
     lines += [
-        f"| Peel-chain hops: precision / recall | {summary['peel_precision_mean']:.1%} / {summary['peel_recall_mean']:.1%} |",
+        f"| Peel-chain hops: precision / recall | {summary['peel_precision_mean']:.1%} / {summary['peel_recall_mean']:.1%} (published CHAIN leads that are real chains: {summary['peel_lead_precision_mean']:.1%}) |",
         f"| Merge suggestions (top 50): same operator | {summary['suggest_precision_mean']:.1%} (random pairs: {summary['suggest_random_rate_mean']:.2%}) |",
+        f"| Lead ranker PR-AUC, with watchlist seeds / without | **{summary['ranker_seeded_pr_auc_mean']:.3f}** / **{summary['ranker_blind_pr_auc_mean']:.3f}** |",
+        f"| Baseline: taint alone, PR-AUC with seeds / without | {summary['ranker_seeded_taint_only_pr_auc_mean']:.3f} / {summary['ranker_blind_taint_only_pr_auc_mean']:.3f} |",
+        f"| Illicit actors ranked first (R-precision), with seeds / without | {summary['ranker_seeded_r_precision_mean']:.1%} / {summary['ranker_blind_r_precision_mean']:.1%} (illicit share of actors: {summary['ranker_seeded_prevalence_mean']:.1%}) |",
+        f"| Illicit actors found in the top 20, with seeds / without | {summary['ranker_seeded_recall_at_20_mean']:.1%} / {summary['ranker_blind_recall_at_20_mean']:.1%} |",
+        f"| Calibration error (ECE), with / without seeds | {summary['ranker_seeded_ece_mean']:.3f} / {summary['ranker_blind_ece_mean']:.3f} |",
+        f"| Stability: PR-AUC change when the country feature is removed | {summary['ranker_seeded_country_ablation_delta_mean']:+.4f} |",
         f"| Change output identified (per transaction) | **{summary['change_argmax_accuracy_mean']:.1%}** |",
         f"| Change links used for clustering: precision | **{summary['change_merge_precision_mean']:.1%}** ({summary['change_merge_links_total']} links) |",
         "",

@@ -324,6 +324,18 @@ def evals_train_origin() -> None:
     typer.echo(f"trained origin-lr@1 on {info['rows']} candidate rows ({info['positives']} true origins)")
 
 
+@evals_app.command("train-ranker")
+def evals_train_ranker() -> None:
+    """Train the lead ranker (LightGBM + isotonic calibration) on generated worlds (seeds 300-339)."""
+    from sutradhar_evals.train_ranker import main as train
+
+    info = train()["trained_on"]
+    typer.echo(
+        f"trained lead ranker on {info['actors']} actors ({info['positives']} illicit), "
+        f"{info['best_iteration']} trees, validation PR-AUC {info['validation_pr_auc']}"
+    )
+
+
 @evals_app.command("train-change")
 def evals_train_change() -> None:
     """Train the change-address model on generated worlds (seeds 200-215) and write its JSON weights."""

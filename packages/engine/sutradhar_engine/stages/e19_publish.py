@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import json
 
+from sutradhar_engine.actor_model import model_versions
 from sutradhar_engine.digest import combine, table_digest
+from sutradhar_engine.explain.guard import check_summary
 from sutradhar_engine.runner import RunContext, RunError, StageReport, code_version
+from sutradhar_schemas.canonical import sha256_file
 from sutradhar_schemas.evidence import RunManifest
 
 RESULT_TABLES: dict[str, tuple[str, ...]] = {
@@ -18,6 +21,13 @@ RESULT_TABLES: dict[str, tuple[str, ...]] = {
     "d_ip": ("ip_i",),
     "lead": ("lead_i",),
 }
+
+
+def _seeds_digest(ctx: RunContext) -> str | None:
+    path = ctx.run_dir / "seeds.csv"
+    if not path.exists():
+        path = ctx.dataset_path.parent / "watchlist.csv"
+    return sha256_file(path) if path.exists() else None
 
 
 class PublishStage:
@@ -33,6 +43,11 @@ class PublishStage:
         ).fetchone()[0]  # type: ignore[index]
         if bad:
             raise RunError("E19", f"{bad} lead(s) violate I6 (reasons, families, probability range)")
+        for (summary,) in con.execute("SELECT summary FROM lead").fetchall():
+            try:
+                check_summary(summary)  # I17: hedged wording, no statements of guilt or identity
+            except ValueError as exc:
+                raise RunError("E19", str(exc)) from exc
         present = [
             t
             for t in RESULT_TABLES
@@ -57,6 +72,8 @@ class PublishStage:
                 "seed": ctx.settings.seed,
                 "threads": ctx.settings.threads,
                 "settings_sha256": ctx.settings.sha256(),
+                "models": model_versions(),
+                "seeds_sha256": _seeds_digest(ctx),
             },
             stages=ctx.stats,
             result_tables=present,

@@ -10,8 +10,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import duckdb
-from sqlalchemy import insert
-from sqlalchemy.dialects import postgresql, sqlite
+from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
 from sutradhar_api import audit
@@ -22,7 +21,7 @@ from sutradhar_schemas.ids import new_id
 
 LEAD_SQL = (
     "SELECT lead_key, type, subject_kind, subject_ref, p, grade, priority, families, reasons, value_at_risk_sats,"
-    " last_activity_us, title, summary, calibrated, model_version FROM lead ORDER BY lead_i"
+    " last_activity_us, title, summary, calibrated, model_version, explain FROM lead ORDER BY lead_i"
 )
 
 
@@ -86,27 +85,68 @@ class IngestHandler:
             )
 
 
-def _upsert_lead_states(session: Session, keys: list[str], run_id: str) -> None:
-    if not keys:
-        return
-    dialect = session.get_bind().dialect.name
-    ins = postgresql.insert(LeadState) if dialect == "postgresql" else sqlite.insert(LeadState)
-    now = utcnow()
-    rows = [
-        {
-            "lead_key": k,
-            "status": "NEW",
-            "last_seen_run_id": run_id,
-            "changed_since_review": False,
-            "updated_at": now,
-        }
-        for k in keys
-    ]
-    for start in range(0, len(rows), 5000):
-        stmt = ins.values(rows[start : start + 5000])
-        session.execute(
-            stmt.on_conflict_do_update(index_elements=["lead_key"], set_={"last_seen_run_id": run_id})
-        )
+CHANGE_P = 0.15  # a lead has "changed since review" when its confidence moved by at least this much, or its grade changed
+
+
+def _previous(session: Session, keys: list[str], run_id: str) -> dict[str, tuple[float, str]]:
+    """Latest earlier (p, grade) per lead key, from any other run."""
+    prev: dict[str, tuple[float, str]] = {}
+    for start in range(0, len(keys), 400):
+        chunk = keys[start : start + 400]
+        rows = session.execute(
+            select(Lead.lead_key, Lead.p, Lead.grade)
+            .where(Lead.lead_key.in_(chunk), Lead.run_id != run_id)
+            .order_by(Lead.created_at, Lead.id)
+        ).all()
+        for key, p, grade in rows:  # later rows overwrite earlier ones
+            prev[key] = (float(p), grade)
+    return prev
+
+
+def _upsert_lead_states(session: Session, leads: list[dict[str, Any]], run_id: str) -> dict[str, int]:
+    """Create state for new leads, keep it for known ones, and flag reviewed leads whose evidence moved.
+    Returns {"new": n, "changed": n} for the publish event."""
+    if not leads:
+        return {"new": 0, "changed": 0}
+    keys = [lead["lead_key"] for lead in leads]
+    prev = _previous(session, keys, run_id)
+    existing = {
+        st.lead_key: st
+        for start in range(0, len(keys), 400)
+        for st in session.scalars(select(LeadState).where(LeadState.lead_key.in_(keys[start : start + 400])))
+    }
+    now, new, changed = utcnow(), 0, 0
+    for lead in leads:
+        key = lead["lead_key"]
+        state = existing.get(key)
+        if state is None:
+            session.add(
+                LeadState(
+                    lead_key=key,
+                    status="NEW",
+                    last_seen_run_id=run_id,
+                    changed_since_review=False,
+                    updated_at=now,
+                )
+            )
+            new += 1
+            continue
+        state.last_seen_run_id = run_id
+        old = prev.get(key)
+        moved = old is not None and (abs(old[0] - lead["p"]) >= CHANGE_P or old[1] != lead["grade"])
+        if moved and state.status != "NEW":
+            state.changed_since_review, state.updated_at = True, now
+            changed += 1
+    return {"new": new, "changed": changed}
+
+
+def _gone(session: Session, run: Run) -> int:
+    """Leads the previous run of this dataset had that this one no longer has."""
+    if run.prev_run_id is None:
+        return 0
+    old = set(session.scalars(select(Lead.lead_key).where(Lead.run_id == run.prev_run_id)))
+    new = set(session.scalars(select(Lead.lead_key).where(Lead.run_id == run.id)))
+    return len(old - new)
 
 
 def _micros(value: int | None) -> datetime | None:
@@ -152,13 +192,15 @@ class RunHandler:
                 "summary": r[12],
                 "calibrated": bool(r[13]),
                 "model_version": r[14],
+                "explanation": _json(r[15]),
                 "created_at": now,
             }
             for r in rows
         ]
         for start in range(0, len(leads), 5000):
             session.execute(insert(Lead), leads[start : start + 5000])
-        _upsert_lead_states(session, [lead["lead_key"] for lead in leads], run.id)
+        counts = _upsert_lead_states(session, leads, run.id)
+        gone = _gone(session, run)
         run.status, run.stage, run.finished_at = "published", None, now
         run.manifest, run.result_digest = manifest, manifest["result_digest"]
         summary = {"run_id": run.id, "leads": len(leads), "result_digest": manifest["result_digest"]}
@@ -175,8 +217,17 @@ class RunHandler:
             session,
             claim.job_id,
             "run.published",
-            {"run_id": run.id, "new": len(leads), "changed": 0, "gone": 0},
+            {"run_id": run.id, **counts, "gone": gone},
         )
+        for lead in leads:
+            hit = (lead["explanation"] or {}).get("seed_hit")
+            if hit:
+                add_event(
+                    session,
+                    claim.job_id,
+                    "lead.watchlist_hit",
+                    {"run_id": run.id, "lead_key": lead["lead_key"], "watchlist": hit},
+                )
         return summary
 
     def on_failure(self, session: Session, payload: dict[str, Any], error: str) -> None:

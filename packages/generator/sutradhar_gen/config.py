@@ -106,6 +106,19 @@ class DarknetCfg(_Cfg):
     cashout_after_h: float = Field(default=3.0, gt=0)
 
 
+class LookalikeCfg(_Cfg):
+    """Legitimate actors whose transaction shapes resemble illicit ones (hard negatives for every detector)."""
+
+    merchants: int = Field(default=0, ge=0, le=50)
+    merchant_sales_per_day: float = Field(default=14.0, gt=0)
+    merchant_sweep_every_h: float = Field(default=10.0, gt=0)
+    payroll_employers: int = Field(default=0, ge=0, le=10)
+    payroll_employees: int = Field(default=9, ge=2, le=200)
+    payroll_every_h: float = Field(default=20.0, gt=0)
+    traders: int = Field(default=0, ge=0, le=50)
+    trader_interval_min: Range = Range(lo=45, hi=150)
+
+
 class OpsCfg(_Cfg):
     ransomware: tuple[RansomwareCfg, ...] = (RansomwareCfg(),)
     coinjoin: tuple[CoinJoinCfg, ...] = ()
@@ -142,6 +155,7 @@ class ScenarioConfig(_Cfg):
     time: TimeCfg = TimeCfg()
     economy: EconomyCfg = EconomyCfg()
     ops: OpsCfg = OpsCfg()
+    lookalikes: LookalikeCfg = LookalikeCfg()
     network: NetworkCfg = NetworkCfg()
     observation: ObservationCfg = ObservationCfg()
 
@@ -153,6 +167,22 @@ PRESETS: dict[str, ScenarioConfig] = {
         time=TimeCfg(days=5.0, warmup_days=1.0),
         economy=EconomyCfg(users=160, user_tx_per_day=1.2),
         ops=OpsCfg(coinjoin=(CoinJoinCfg(),), darknet=(DarknetCfg(),)),
+        lookalikes=LookalikeCfg(merchants=3, payroll_employers=1, traders=3),
+        network=NetworkCfg(ip_space="realistic"),
+    ),
+    "hard": ScenarioConfig(
+        name="hard",
+        description="Rich, with more look-alike legitimate actors and slower, less regular ransomware laundering.",
+        time=TimeCfg(days=5.0, warmup_days=1.0),
+        economy=EconomyCfg(users=180, user_tx_per_day=1.2),
+        ops=OpsCfg(
+            ransomware=(
+                RansomwareCfg(hop_interval_min=Range(lo=70, hi=420), peel_fraction=Range(lo=0.02, hi=0.3)),
+            ),
+            coinjoin=(CoinJoinCfg(),),
+            darknet=(DarknetCfg(),),
+        ),
+        lookalikes=LookalikeCfg(merchants=5, payroll_employers=2, traders=6),
         network=NetworkCfg(ip_space="realistic"),
     ),
     "demo": ScenarioConfig(

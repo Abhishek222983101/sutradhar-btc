@@ -17,6 +17,7 @@ from sutradhar_gen import __version__
 from sutradhar_gen.agents import ExchangeState, setup_exchanges, setup_users
 from sutradhar_gen.config import ScenarioConfig
 from sutradhar_gen.export import write_canonical_csv, write_parquet
+from sutradhar_gen.lookalikes import setup_lookalikes
 from sutradhar_gen.network import Topology, build_topology
 from sutradhar_gen.observe import ObservationLog, VantageObserver, origin_observable
 from sutradhar_gen.ops import DarknetState, RansomwareState, setup_coinjoin, setup_darknet, setup_ransomware
@@ -32,6 +33,8 @@ def generate(cfg: ScenarioConfig, seed: int, out: Path) -> dict[str, Any]:
     ops += [setup_darknet(world, dc, users, exchanges) for dc in cfg.ops.darknet]
     for cc in cfg.ops.coinjoin:
         setup_coinjoin(world, cc, users)
+    if cfg.lookalikes.merchants or cfg.lookalikes.payroll_employers or cfg.lookalikes.traders:
+        setup_lookalikes(world, cfg.lookalikes, users)
     topo = build_topology(world)
     world.run()
 

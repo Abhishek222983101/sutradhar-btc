@@ -18,6 +18,7 @@ from sutradhar_api.models import (
     AuthSession,
     Dataset,
     DatasetFile,
+    Feedback,
     Job,
     JobEvent,
     Lead,
@@ -87,6 +88,8 @@ def _purge_visitors(db: Database) -> int:
             session_ids = select(AuthSession.id).where(AuthSession.user_id == user_id)
             session.execute(delete(RefreshToken).where(RefreshToken.session_id.in_(session_ids)))
             session.execute(delete(AuthSession).where(AuthSession.user_id == user_id))
+            session.execute(delete(LeadState).where(LeadState.lead_key.like(f"u:{user_id}:%")))
+            session.execute(delete(Feedback).where(Feedback.user_id == user_id))
             job_ids = select(Job.id).where(Job.created_by == user_id)
             session.execute(delete(JobEvent).where(JobEvent.job_id.in_(job_ids)))
             session.execute(delete(Job).where(Job.created_by == user_id))

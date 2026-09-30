@@ -86,10 +86,12 @@ def test_upload_ingest_run_leads(client: TestClient, tiny_csv: bytes) -> None:
     assert run["status"] == "published"
     assert len(run["result_digest"]) == 64
     leads = client.get(f"/api/v1/runs/{run_id}/leads", headers=headers, params={"limit": 5}).json()
-    assert leads["items"], "the stub ranker flags peel-shaped transactions"
+    assert leads["items"], "the ranker publishes leads for the generated world"
     first = leads["items"][0]
-    assert first["calibrated"] is False
-    assert first["model_version"] == "evidence@0.1"
+    assert first["calibrated"] is (
+        first["type"] in ("ACTOR", "CASHOUT", "IP")
+    )  # model-scored leads are calibrated
+    assert first["model_version"]
     assert first["state"]["status"] == "NEW"
     assert first["families"]
     detail = client.get(f"/api/v1/leads/{first['id']}", headers=headers).json()

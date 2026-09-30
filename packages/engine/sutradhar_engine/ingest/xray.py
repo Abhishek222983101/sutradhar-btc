@@ -10,8 +10,8 @@ import duckdb
 from sutradhar_schemas.enums import ObservationModel
 from sutradhar_schemas.evidence import CapabilityProfile, NetworkCapability
 
-ALL_STAGES = [f"E{i:02d}" for i in range(1, 20)]
-NET_STAGES = ("E09", "E10", "E11", "E16")
+ALL_STAGES = [f"E{i:02d}" for i in range(1, 30)]
+NET_STAGES = ("E09", "E10", "E11", "E16")  # stages that need network observations
 
 
 def _scalar(con: duckdb.DuckDBPyConnection, sql: str) -> float:

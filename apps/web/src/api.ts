@@ -64,7 +64,8 @@ export type Lead = {
   state: { status: string } | null; reasons?: Reason[];
 };
 export type Evidence = {
-  ip: string; cluster_id: string; addresses: string[];
+  ip: string | null;
+  ips?: { ip: string; n_tx: number }[]; cluster_id: string; addresses: string[];
   transactions: { txid: string; sats: number; candidates: { ip: string; p: number }[]; arrivals: { from: string; sensor: string; dt_ms: number }[] }[];
 };
 export type Info = { mode: string; version: string; database: string; offline_guard: { mode: string; active: boolean; blocked_attempts: number } };

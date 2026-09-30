@@ -1,0 +1,39 @@
+# Plain-language reasons for each ranker feature. `up` is used when the feature pushed the score UP, `down` when it
+# pulled it DOWN. Wording is hedged: it describes what the data shows, never who someone is or what they intend.
+# `fmt` says how {value} is shown.  Checked by explain/guard.py in the test suite.
+log_n_addr:      {label: "Addresses in the wallet", fmt: log_count, up: "The wallet groups {value} addresses that were spent together, so it is a large, active wallet.", down: "The wallet is small ({value} addresses)."}
+log_tx_sent:     {label: "Payments sent", fmt: log_count, up: "It has sent {value} payments, which is unusually busy.", down: "It has sent only {value} payments, which is quiet."}
+log_tx_recv:     {label: "Payments received", fmt: log_count, up: "It received money in {value} separate payments.", down: "It received money in few payments ({value})."}
+log_counterparties: {label: "Wallets it deals with", fmt: log_count, up: "It exchanged value with {value} other wallets.", down: "It dealt with few other wallets ({value})."}
+avg_n_in:        {label: "Coins per payment", fmt: num, up: "Its payments gather many coins at once (about {value} inputs each).", down: "Its payments use few coins at once ({value} on average)."}
+avg_n_out:       {label: "Recipients per payment", fmt: num, up: "Its payments split money across many outputs (about {value} each).", down: "Its payments go to few recipients ({value} on average)."}
+log_sent:        {label: "Value sent", fmt: log_btc, up: "It has moved about {value} BTC out.", down: "It has moved little value ({value} BTC)."}
+log_recv:        {label: "Value received", fmt: log_btc, up: "It has received about {value} BTC.", down: "It has received little value ({value} BTC)."}
+log_lifetime_h:  {label: "Time active", fmt: log_hours, up: "It has been active for about {value}.", down: "It was active only briefly ({value})."}
+consolidation_share: {label: "Sweeps many coins into one", fmt: pct, up: "{value} of its payments sweep many coins into one or two outputs, a pattern used to tidy up funds before moving them on.", down: "Few of its payments sweep coins together ({value})."}
+fan_out_share:   {label: "Pays many recipients at once", fmt: pct, up: "{value} of its payments fan out to many recipients at once.", down: "It rarely pays many recipients at once ({value})."}
+coinjoin_share:  {label: "Uses mixing", fmt: pct, up: "{value} of its payments look like joint mixing transactions, which make coins harder to follow.", down: "It rarely takes part in mixing ({value})."}
+peel_share:      {label: "Peeling pattern", fmt: pct, up: "{value} of its payments follow a peeling pattern: a small payment out, the rest passed on to the next step.", down: "Its payments do not follow a peeling pattern."}
+peel_len_max:    {label: "Length of peeling chain", fmt: count, up: "It is part of a chain of {value} consecutive peeling steps, a fast, automated way to spread funds.", down: "It is not part of a long peeling chain."}
+out_service_share: {label: "Sends to exchanges", fmt: pct, up: "{value} of the value it sends goes to an exchange-like service, where funds can be cashed out.", down: "Little of what it sends goes to exchanges ({value})."}
+in_service_share:  {label: "Receives from exchanges", fmt: pct, up: "{value} of what it receives comes from exchange-like services.", down: "Little of what it receives comes from exchanges ({value})."}
+taint_max:       {label: "Traced to watchlisted funds", fmt: pct, up: "About {value} of its funds can be traced back to a watchlisted wallet.", down: "Its funds do not trace back to watchlisted wallets."}
+taint_in_frac:   {label: "Share of inflow from risky wallets", fmt: pct, up: "{value} of the money it receives comes from wallets that themselves carry traced funds.", down: "Little of its inflow comes from wallets carrying traced funds ({value})."}
+ppr_log:         {label: "Closeness to watchlisted wallets", fmt: score, up: "Money flows connect it closely to watchlisted wallets (closeness {value}).", down: "It is far from watchlisted wallets in the money flow."}
+seed_hops:       {label: "Steps from a watchlisted wallet", fmt: hops, up: "It is only {value} step(s) of money flow away from a watchlisted wallet.", down: "It is many steps away from any watchlisted wallet."}
+n_risk_paths:    {label: "Traced routes from a watchlisted wallet", fmt: count, up: "{value} distinct money route(s) lead to it from a watchlisted wallet.", down: "No money route from a watchlisted wallet was found."}
+top_ip_share:    {label: "Same IP behind its payments", fmt: pct, up: "{value} of its payments were most likely first broadcast from the same IP address.", down: "Its payments come from many different IP addresses ({value} from the most common)."}
+n_origin_ips:    {label: "IPs behind its payments", fmt: count, up: "Its payments trace to {value} likely origin IP address(es).", down: "Its payments trace to many different IP addresses ({value})."}
+mean_origin_p:   {label: "Confidence in the origin IP", fmt: pct, up: "The network evidence points to a likely origin IP with about {value} confidence.", down: "The network evidence for the origin IP is weak ({value})."}
+unobservable_share: {label: "Payments the sensors could not see", fmt: pct, up: "{value} of its payments could not be traced to an origin IP, so the network evidence is partial.", down: "Most of its payments were visible to the sensors ({value} were not)."}
+log_shared_ip_clusters: {label: "Other wallets sharing its IP", fmt: log_count, up: "{value} other wallet(s) appear to be operated from the same IP addresses.", down: "No other wallets share its IP addresses."}
+country_count:   {label: "Countries of its IPs", fmt: count, up: "Its likely origin IPs span {value} countries.", down: "Its likely origin IPs are in a single country."}
+tx_anom_max:     {label: "Most unusual payment", fmt: pct, up: "One of its payments is more unusual than {value} of all payments in the data.", down: "None of its payments is unusual."}
+tx_anom_mean:    {label: "Typical unusualness", fmt: pct, up: "Its payments are, on average, more unusual than {value} of the data.", down: "Its payments look ordinary."}
+actor_anom:      {label: "Unusual overall behaviour", fmt: pct, up: "Its overall behaviour is more unusual than {value} of the wallets in the data.", down: "Its overall behaviour looks ordinary."}
+log_fee_rate:    {label: "Fee level", fmt: log_count, up: "It pays unusually high fees ({value} sat/vB).", down: "It pays ordinary fees ({value} sat/vB)."}
+log_gap_h:       {label: "Time between payments", fmt: log_hours, up: "Its payments follow each other quickly (typically {value} apart), consistent with automation.", down: "Its payments are spread far apart (typically {value})."}
+night_share:     {label: "Night-time activity", fmt: pct, up: "{value} of its payments were sent between midnight and 6am UTC.", down: "It is rarely active at night ({value})."}
+victim_exposure: {label: "Paid watchlisted wallets", fmt: pct, up: "{value} of what it sent went to watchlisted wallets, which can indicate it is a payer rather than a recipient.", down: "It has not sent value to watchlisted wallets."}
+service_score:   {label: "Looks like an exchange", fmt: pct, up: "It looks like an exchange or payment service ({value} match).", down: "It does not look like an exchange or service."}
+is_cashout:      {label: "Sends traced funds to an exchange", fmt: bool, up: "It sends value that carries traced funds to an exchange-like service, which may be a cash-out.", down: "No cash-out to an exchange was found."}

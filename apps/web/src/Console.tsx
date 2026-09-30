@@ -73,7 +73,7 @@ function Detail({ lead }: { lead: Lead }) {
   useEffect(() => {
     setFull(null); setEv(null);
     void api<Lead>(`/api/v1/leads/${lead.id}`).then(setFull).catch(() => undefined);
-    if (lead.subject_kind === "ip_cluster") void api<Evidence>(`/api/v1/leads/${lead.id}/evidence`).then(setEv).catch(() => undefined);
+    if (["cluster", "ip", "cashout"].includes(lead.subject_kind)) void api<Evidence>(`/api/v1/leads/${lead.id}/evidence`).then(setEv).catch(() => undefined);
   }, [lead.id, lead.subject_kind]);
   return (
     <>
@@ -111,7 +111,7 @@ function EvidencePanel({ ev }: { ev: Evidence }) {
       <div className="body">
         <p className="note">{ev.addresses.length} address(es) in this wallet, grouped because they were spent together. Thicker lines mean the IP is more likely the first sender.</p>
         <LinkGraph ev={ev} />
-        {ev.transactions.map((t) => <TxCard key={t.txid} tx={t} target={ev.ip} />)}
+        {ev.transactions.map((t) => <TxCard key={t.txid} tx={t} target={ev.ip ?? ""} />)}
       </div>
     </div>
   );

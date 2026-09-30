@@ -34,6 +34,7 @@ STREAMS = (
     "export",
     "coinjoin",
     "darknet",
+    "lookalike",
 )
 
 

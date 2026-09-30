@@ -1,58 +1,53 @@
-"""Demo boot: load the bundled synthetic "hero" world so the very first request already has results.
+"""Demo boot: register the pre-built synthetic "hero" world so the very first request already has results.
 
-The world is generated data (RFC 5737 IPs, invented addresses). Measured accuracy against its hidden ground
-truth is stored alongside, so the UI can show honest numbers instead of claims.
+`scripts/build_hero.py` generates, ingests and analyses the world at development time and packs it into `hero.tar.gz`;
+booting only unpacks it and writes the database rows, so the demo needs no compute and starts instantly. The world is
+generated data (invented addresses, public-looking IPs used only as labels).
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import shutil
+import tarfile
 from pathlib import Path
 
-from sqlalchemy import select
-
-from sutradhar_api import audit
 from sutradhar_api.config import Settings
 from sutradhar_api.db import Database, utcnow
 from sutradhar_api.jobs.handlers import HANDLERS
 from sutradhar_api.jobs.queue import Claim
-from sutradhar_api.models import Dataset, DatasetFile, Job, Run
-from sutradhar_api.routes.runs import MODEL_VERSIONS
-from sutradhar_engine.ingest.builtin_profiles import CANONICAL_CSV
-from sutradhar_engine.ingest.pipeline import ingest
-from sutradhar_engine.pipeline import run_pipeline
-from sutradhar_engine.settings import EngineSettings
-from sutradhar_schemas.canonical import sha256_file
+from sutradhar_api.models import Dataset, Job, Run
 
 log = logging.getLogger("sutradhar.demo")
-HERO = Path(__file__).parent / "demo" / "hero_traffic.csv"
+DEMO = Path(__file__).parent / "demo"
+HERO_ARCHIVE = DEMO / "hero.tar.gz"
+EVAL_JSON = DEMO / "eval.json"
 HERO_DATASET, HERO_RUN = "ds_hero", "run_hero"
-EVAL_JSON = Path(__file__).parent / "demo" / "eval.json"
+
+
+def _unpack(data_dir: Path) -> None:
+    for folder in (f"datasets/{HERO_DATASET}", f"runs/{HERO_RUN}"):
+        shutil.rmtree(data_dir / folder, ignore_errors=True)
+    with tarfile.open(HERO_ARCHIVE, "r:gz") as tar:
+        tar.extractall(
+            data_dir, filter="data"
+        )  # the "data" filter refuses absolute paths, links and traversal
 
 
 def seed_hero(db: Database, settings: Settings) -> None:
     with db.read() as session:
         if session.get(Dataset, HERO_DATASET) is not None:
             return
+    if not HERO_ARCHIVE.exists():
+        log.warning("no hero archive: the demo world is not available (run scripts/build_hero.py)")
+        return
     data = settings.data_dir
-    for folder in ("uploads", "datasets", "runs"):
-        shutil.rmtree(data / folder / (HERO_DATASET if folder != "runs" else HERO_RUN), ignore_errors=True)
-    (data / "uploads" / HERO_DATASET).mkdir(parents=True, exist_ok=True)
-    shutil.copy(HERO, data / "uploads" / HERO_DATASET / "traffic.csv")
-    ingested = ingest(
-        [data / "uploads" / HERO_DATASET / "traffic.csv"],
-        CANONICAL_CSV,
-        data / "datasets" / HERO_DATASET,
-        HERO_DATASET,
-    )
-    shutil.copy(HERO.with_name("hero_watchlist.csv"), data / "datasets" / HERO_DATASET / "watchlist.csv")
-    manifest = run_pipeline(
-        data / "datasets" / HERO_DATASET,
-        data / "runs" / HERO_RUN,
-        HERO_RUN,
-        settings=EngineSettings(threads=settings.engine_threads),
-    )
+    _unpack(data)
+    ds_dir, run_dir = data / "datasets" / HERO_DATASET, data / "runs" / HERO_RUN
+    dataset_manifest = json.loads((ds_dir / "manifest.json").read_text(encoding="utf-8"))
+    capability = json.loads((ds_dir / "xray.json").read_text(encoding="utf-8"))
+    run_manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     now = utcnow()
     with db.write() as s:
         s.add(
@@ -61,31 +56,19 @@ def seed_hero(db: Database, settings: Settings) -> None:
                 name="Hero world (synthetic)",
                 status="uploaded",
                 source="generator",
-                bytes=HERO.stat().st_size,
                 created_by=None,
                 created_at=now,
             )
         )
         s.flush()
         s.add(
-            DatasetFile(
-                id="file_hero",
-                dataset_id=HERO_DATASET,
-                filename="traffic.csv",
-                format="csv",
-                sha256=sha256_file(HERO),
-                bytes=HERO.stat().st_size,
-                created_at=now,
-            )
-        )
-        s.add(
             Run(
                 id=HERO_RUN,
                 dataset_id=HERO_DATASET,
                 status="running",
-                config=EngineSettings(threads=settings.engine_threads).model_dump(mode="json"),
-                model_versions=MODEL_VERSIONS,
-                refdata_versions={},
+                config=run_manifest["config"],
+                model_versions=run_manifest["config"].get("models", {}),
+                refdata_versions={"watchlist": {"items": 1}},
                 created_by=None,
                 created_at=now,
             )
@@ -111,25 +94,14 @@ def seed_hero(db: Database, settings: Settings) -> None:
         HANDLERS["ingest"].on_success(
             s,
             Claim("job_hero_ingest", "ingest", {"dataset_id": HERO_DATASET}, 1, "seed"),
-            {
-                "manifest": ingested.manifest.model_dump(mode="json"),
-                "capability": ingested.capability.model_dump(mode="json"),
-            },
+            {"manifest": dataset_manifest, "capability": capability},
             data,
         )
         HANDLERS["run"].on_success(
             s,
             Claim("job_hero_run", "run", {"run_id": HERO_RUN, "dataset_id": HERO_DATASET}, 1, "seed"),
-            {"manifest": manifest.model_dump(mode="json")},
+            {"manifest": run_manifest},
             data,
         )
         s.commit()
-    log.info("hero world loaded: %s", HERO_RUN)
-
-
-def hero_leads_exist(db: Database) -> bool:
-    with db.read() as session:
-        return session.scalar(select(Run.id).where(Run.id == HERO_RUN)) is not None
-
-
-__all__ = ["EVAL_JSON", "audit", "seed_hero"]
+    log.info("hero world registered: %s", HERO_RUN)

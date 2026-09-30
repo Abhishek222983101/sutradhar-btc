@@ -216,6 +216,7 @@ class Lead(Base):
     summary: Mapped[str] = mapped_column(Text)
     calibrated: Mapped[bool] = mapped_column(Boolean)
     model_version: Mapped[str] = mapped_column(Text)
+    explanation: Mapped[dict[str, Any]] = mapped_column(default=dict, server_default=text("'{}'"))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
@@ -276,4 +277,128 @@ class MergeDecision(Base):
     reason: Mapped[str] = mapped_column(Text)
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"))
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class Watchlist(Base):
+    __tablename__ = "watchlists"
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_watchlists_name"),
+        CheckConstraint("kind IN ('address', 'ip')", name="kind"),
+    )
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(Text)
+    created_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class WatchlistItem(Base):
+    __tablename__ = "watchlist_items"
+    __table_args__ = (
+        UniqueConstraint("watchlist_id", "value", name="uq_watchlist_items_watchlist_id"),
+        CheckConstraint(
+            "category IN ('ransomware', 'darknet', 'scam', 'theft', 'sanctioned', 'mixer', 'other')",
+            name="category",
+        ),
+        CheckConstraint("confidence > 0 AND confidence <= 1", name="confidence"),
+        Index("ix_watchlist_items_watchlist_id_id", "watchlist_id", "id"),
+    )
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    watchlist_id: Mapped[str] = mapped_column(ForeignKey("watchlists.id"))
+    value: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(Text)
+    confidence: Mapped[float] = mapped_column(Float)
+    added_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    added_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+    __table_args__ = (
+        CheckConstraint("verdict IN ('confirm', 'dismiss', 'escalate')", name="verdict"),
+        CheckConstraint("verdict <> 'dismiss' OR reason_code IS NOT NULL", name="dismiss_reason"),
+        CheckConstraint(
+            "reason_code IS NULL OR reason_code IN ('benign_service', 'victim', 'duplicate', 'insufficient_evidence',"
+            " 'known_false_positive_pattern', 'other')",
+            name="reason_code",
+        ),
+        Index("ix_feedback_lead_key", "lead_key", "created_at"),
+    )
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    lead_key: Mapped[str] = mapped_column(Text)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    verdict: Mapped[str] = mapped_column(Text)
+    reason_code: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class Case(Base):
+    __tablename__ = "cases"
+    __table_args__ = (CheckConstraint("status IN ('open', 'closed', 'archived')", name="status"),)
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    title: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, default="open")
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    summary: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    closed_at: Mapped[datetime | None]
+
+
+class CaseItem(Base):
+    __tablename__ = "case_items"
+    __table_args__ = (
+        UniqueConstraint("case_id", "item_kind", "ref", "run_id", name="uq_case_items_case_id"),
+        CheckConstraint("item_kind IN ('lead', 'actor', 'address', 'tx', 'ip', 'chain')", name="kind"),
+        Index("ix_case_items_case_id_added_at", "case_id", "added_at"),
+    )
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"))
+    item_kind: Mapped[str] = mapped_column(Text)
+    ref: Mapped[str] = mapped_column(Text)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"))
+    note: Mapped[str | None] = mapped_column(Text)
+    added_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    added_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class CaseNote(Base):
+    __tablename__ = "case_notes"
+    __table_args__ = (Index("ix_case_notes_case_id_created_at", "case_id", "created_at"),)
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"))
+    author_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    body_md: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class Export(Base):
+    __tablename__ = "exports"
+    __table_args__ = (
+        CheckConstraint("kind IN ('evidence_pack', 'misp', 'stix', 'graphml', 'i2csv', 'pdf')", name="kind"),
+        CheckConstraint("status IN ('queued', 'ready', 'failed')", name="status"),
+    )
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    case_id: Mapped[str | None] = mapped_column(ForeignKey("cases.id"))
+    kind: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, default="queued")
+    file_path: Mapped[str | None] = mapped_column(Text)
+    sha256: Mapped[str | None] = mapped_column(Text)
+    bytes: Mapped[int | None] = mapped_column(BigInteger)
+    manifest: Mapped[dict[str, Any] | None]
+    error: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    approved_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class Verification(Base):
+    __tablename__ = "verifications"
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    file_sha256: Mapped[str] = mapped_column(Text)
+    result: Mapped[dict[str, Any]]
+    verified_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)

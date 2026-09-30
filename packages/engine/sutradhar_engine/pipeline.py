@@ -29,7 +29,11 @@ from sutradhar_engine.stages import (
     e15_motifs,
     e16_suggest,
     e17_rank,
+    e18_explain,
     e19_publish,
+    e20_services,
+    e21_risk,
+    e22_actor_features,
 )
 from sutradhar_engine.store.ddl import RUN_BASE_DDL
 from sutradhar_schemas.evidence import CapabilityProfile, RunManifest
@@ -48,10 +52,14 @@ DEFAULT_STAGES: tuple[Stage, ...] = (
     e08_anomaly.STAGE,
     e09_origin.STAGE,
     e11_coorigin.STAGE,
+    e20_services.STAGE,
     e13_taint.STAGE,
+    e21_risk.STAGE,
+    e22_actor_features.STAGE,
     e14_fingerprint.STAGE,
     e16_suggest.STAGE,
     e17_rank.STAGE,
+    e18_explain.STAGE,
     e19_publish.STAGE,
 )
 

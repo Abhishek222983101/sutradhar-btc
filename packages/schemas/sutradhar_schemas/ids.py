@@ -9,7 +9,27 @@ from typing import Final
 
 _CROCKFORD: Final = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 PREFIXES: Final = frozenset(
-    {"ds", "run", "job", "ld", "case", "exp", "usr", "mdl", "mp", "wl", "sess", "scn", "ev", "file"}
+    {
+        "ds",
+        "run",
+        "job",
+        "ld",
+        "case",
+        "exp",
+        "usr",
+        "mdl",
+        "mp",
+        "wl",
+        "sess",
+        "scn",
+        "ev",
+        "file",
+        "wli",
+        "fb",
+        "cmt",
+        "note",
+        "cit",
+    }
 )
 ID_RE: Final = re.compile(r"^(?P<prefix>[a-z]{2,4})_(?P<ulid>[0-9A-HJKMNP-TV-Z]{26})$")
 # Ids chosen by people (e.g. `ds_demo`) are allowed but can never contain path or shell metacharacters.

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import itertools
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import duckdb
+import numpy as np
 import polars as pl
 
 from sutradhar_engine.ingest.builtin_profiles import CANONICAL_CSV
@@ -26,7 +28,12 @@ class WorldRun:
 
 
 def build_world(
-    cfg: ScenarioConfig, seed: int, out: Path, *, settings: EngineSettings | None = None
+    cfg: ScenarioConfig,
+    seed: int,
+    out: Path,
+    *,
+    settings: EngineSettings | None = None,
+    with_seeds: bool = True,
 ) -> WorldRun:
     """Generate a world, ingest it, and run the engine over it. `out` is wiped first (reproducible)."""
     shutil.rmtree(out, ignore_errors=True)
@@ -34,7 +41,7 @@ def build_world(
     files = [out / "world" / "data" / "traffic.csv"]
     ingest(files, CANONICAL_CSV, out / "ds", f"ds_eval_{seed}")
     watchlist = out / "world" / "data" / "watchlist.csv"
-    if watchlist.exists():
+    if watchlist.exists() and with_seeds:
         shutil.copy(watchlist, out / "ds" / "watchlist.csv")
     run_id = f"run_eval_{seed}"
     run_pipeline(out / "ds", out / "run", run_id, settings=settings or EngineSettings())
@@ -210,6 +217,7 @@ class PeelMetrics:
     detected_txs: int
     precision: float
     recall: float
+    lead_precision: float = 1.0  # of the CHAIN leads published, the share that are real chains
 
 
 def peel_detection(world: WorldRun) -> PeelMetrics:
@@ -226,7 +234,26 @@ def peel_detection(world: WorldRun) -> PeelMetrics:
         len(found),
         round(tp / len(found), 4) if found else 1.0,
         round(tp / len(actual), 4) if actual else 1.0,
+        chain_lead_precision(world),
     )
+
+
+def chain_lead_precision(world: WorldRun) -> float:
+    """Of the CHAIN leads the system publishes, how many are (mostly) real peeling chains?"""
+    truth = pl.read_parquet(world.world_dir / "truth" / "txs.parquet").filter(
+        pl.col("peel_chain_id").is_not_null()
+    )
+    actual = set(truth["txid"].to_list())
+    con = duckdb.connect(str(world.run_dir / "run.duckdb"), read_only=True)
+    chains = {
+        r[0]: {x[0] for x in con.execute("SELECT txid FROM peel_chain WHERE chain_id = ?", [r[0]]).fetchall()}
+        for r in con.execute("SELECT subject_ref FROM lead WHERE type = 'CHAIN'").fetchall()
+    }
+    con.close()
+    if not chains:
+        return 1.0
+    good = sum(1 for txs in chains.values() if len(txs & actual) / len(txs) >= 0.5)
+    return round(good / len(chains), 4)
 
 
 @dataclass(frozen=True)
@@ -269,6 +296,69 @@ def suggestion_quality(world: WorldRun, k: int = 50) -> SuggestionMetrics:
 
 
 @dataclass(frozen=True)
+class RankerMetrics:
+    actors: int
+    positives: int
+    prevalence: float
+    pr_auc: float
+    taint_only_pr_auc: float  # baseline: rank by taint alone
+    r_precision: (
+        float  # precision at k = number of illicit actors: 1.0 means every one is ranked above all others
+    )
+    recall_at_20: float
+    ece: float  # expected calibration error of the calibrated confidence
+    country_ablation_delta: float  # PR-AUC change when the country feature is removed (stability)
+
+
+def _ece(p: np.ndarray, y: np.ndarray, bins: int = 10) -> float:
+    edges = np.linspace(0, 1, bins + 1)
+    total = 0.0
+    for lo, hi in itertools.pairwise(edges):
+        mask = (p >= lo) & ((p < hi) if hi < 1 else (p <= hi))
+        if mask.any():
+            total += mask.mean() * abs(float(y[mask].mean()) - float(p[mask].mean()))
+    return float(total)
+
+
+def ranker_quality(world: WorldRun) -> RankerMetrics:
+    from sklearn.metrics import average_precision_score
+
+    from sutradhar_engine.actor_model import FEATURES, Ranker
+    from sutradhar_evals.train_ranker import actor_table
+
+    table = actor_table(world)
+    con = duckdb.connect(str(world.run_dir / "run.duckdb"), read_only=True)
+    barred = {
+        r[0]
+        for r in con.execute("SELECT cluster_id FROM service UNION SELECT cluster_id FROM victim").fetchall()
+    }
+    con.close()
+    table = table.filter(~pl.col("cluster_id").is_in(list(barred)))  # leads never include services or victims
+    x = table.select(FEATURES).to_numpy().astype(float)
+    y = table["y"].to_numpy()
+    if y.sum() == 0:
+        return RankerMetrics(len(y), 0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0)
+    ranker = Ranker()
+    p = ranker.prob(x)
+    order = np.argsort(-p, kind="stable")
+    n_pos = int(y.sum())
+    ablated = x.copy()
+    ablated[:, FEATURES.index("country_count")] = 0.0
+    pr = float(average_precision_score(y, p))
+    return RankerMetrics(
+        len(y),
+        int(y.sum()),
+        round(float(y.mean()), 5),
+        round(pr, 4),
+        round(float(average_precision_score(y, table["taint_max"].to_numpy())), 4),
+        round(float(y[order[:n_pos]].mean()), 4),
+        round(float(y[order[:20]].sum()) / n_pos, 4),
+        round(_ece(p, y), 4),
+        round(float(average_precision_score(y, ranker.prob(ablated))) - pr, 4),
+    )
+
+
+@dataclass(frozen=True)
 class EvalReport:
     scenario: str
     seed: int
@@ -279,6 +369,8 @@ class EvalReport:
     change: ChangeMetrics
     peel: PeelMetrics
     suggest: SuggestionMetrics
+    ranker: RankerMetrics
+    ranker_blind: RankerMetrics
 
     def to_dict(self) -> dict:
         return {
@@ -291,11 +383,14 @@ class EvalReport:
             "change": asdict(self.change),
             "peel": asdict(self.peel),
             "suggest": asdict(self.suggest),
+            "ranker": asdict(self.ranker),
+            "ranker_blind": asdict(self.ranker_blind),
         }
 
 
 def evaluate(cfg: ScenarioConfig, seed: int, out: Path) -> EvalReport:
     world = build_world(cfg, seed, out)
+    blind = build_world(cfg, seed, out.parent / f"{out.name}_blind", with_seeds=False)
     return EvalReport(
         cfg.name,
         seed,
@@ -306,4 +401,6 @@ def evaluate(cfg: ScenarioConfig, seed: int, out: Path) -> EvalReport:
         change_detection(world),
         peel_detection(world),
         suggestion_quality(world),
+        ranker_quality(world),
+        ranker_quality(blind),
     )

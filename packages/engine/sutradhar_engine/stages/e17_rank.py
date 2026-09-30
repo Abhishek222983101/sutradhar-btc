@@ -1,10 +1,11 @@
-"""E17 rank - turns evidence into ranked, explained leads: "this IP is likely behind this wallet cluster".
+"""E17 rank - turn actor features into calibrated, graded, prioritised leads (five lead types).
 
-For each (origin IP, wallet cluster) pair, the evidence is how many of the cluster's spending transactions
-this IP most probably originated, and how confident each origin call was. p = 1 - prod(1 - p_i * w) over those
-transactions (each independent call adds support; w discounts a single weak call). Grades: A p>=0.85 with
-3+ transactions, B p>=0.65, else C. Wording is hedged (I17). `calibrated` is false: p is a transparent
-evidence score until the trained ranker replaces it, and the UI says so.
+ACTOR   a wallet cluster scored by the trained lead ranker (LightGBM) and calibrated (isotonic).
+CASHOUT a flagged cluster moving traced funds into an exchange-like service.
+CHAIN   a peeling chain.   TX  a statistically unusual transaction.   IP  an address behind several flagged actors.
+
+Grade uses *independent evidence families*, not just the score: A needs p >= 0.8 and three families; B needs
+p >= 0.5 and two; everything else is C. Services and victims never become ACTOR leads. `explain` is filled by E18.
 """
 
 from __future__ import annotations
@@ -12,7 +13,10 @@ from __future__ import annotations
 import json
 import math
 
-from sutradhar_engine.runner import RunContext, StageReport
+import numpy as np
+
+from sutradhar_engine.actor_model import FAMILIES, FEATURE_FAMILY, FEATURES, Ranker, available
+from sutradhar_engine.runner import RunContext, RunError, StageReport
 from sutradhar_schemas.canonical import sha256_hex
 
 LEAD_DDL = """
@@ -34,280 +38,346 @@ CREATE TABLE IF NOT EXISTS lead (
     calibrated         BOOLEAN NOT NULL,
     method             VARCHAR NOT NULL,
     model_version      VARCHAR NOT NULL,
-    run_id             VARCHAR NOT NULL
+    run_id             VARCHAR NOT NULL,
+    explain            JSON    NOT NULL DEFAULT '{}'
 )
 """
-MODEL_VERSION = "evidence@0.1"
-WEAK_CALL = 0.9
-MIN_P = 0.30
-
-PAIRS_SQL = """
-WITH tx_cluster AS (
-  SELECT i.txid, min(c.cluster_id) AS cluster_id FROM ds.txin i JOIN cluster c USING (address) GROUP BY i.txid
-), top_origin AS (SELECT txid, ip, p, sensors_first, sensors_heard FROM origin WHERE rnk = 1)
-SELECT o.ip, t.cluster_id, count(*) AS n_tx, list(o.p ORDER BY o.txid) AS ps,
-       sum(x.in_sats) AS value_sats, max(x.first_seen_us) AS last_us,
-       (SELECT count(*) FROM cluster c2 WHERE c2.cluster_id = t.cluster_id) AS n_addr,
-       avg(o.sensors_heard * 1.0) AS first_share
-FROM top_origin o JOIN tx_cluster t USING (txid) JOIN ds.tx x USING (txid)
-GROUP BY o.ip, t.cluster_id
-"""
+INSERT_SQL = "INSERT INTO lead VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
 
 def lead_key(lead_type: str, subject_kind: str, subject_ref: str) -> str:
     return sha256_hex(f"{lead_type}|{subject_kind}|{subject_ref}")[:16]
 
 
-def _grade(p: float, n: int) -> str:
-    if p >= 0.85 and n >= 3:
+def grade_for(p: float, n_families: int) -> str:
+    if p >= 0.8 and n_families >= 3:
         return "A"
-    return "B" if p >= 0.65 else "C"
+    return "B" if p >= 0.5 and n_families >= 2 else "C"
 
 
-def _row(
-    kind: str,
-    subject_kind: str,
-    subject: str,
-    p: float,
-    families: list[str],
-    reasons: list,
-    value: int,
-    last_us: int | None,
-    title: str,
-    summary: str,
-) -> tuple:
-    p = round(min(0.99, p), 4)
-    return (
-        lead_key(kind, subject_kind, subject),
-        kind,
-        subject_kind,
-        subject,
-        p,
-        _grade(p, 0 if p < 0.85 else 3),
-        round(p * (1 + math.log10(1 + value / 1e8)), 4),
-        json.dumps(families),
-        json.dumps(reasons),
-        value,
-        last_us,
-        title,
-        summary,
-    )
-
-
-def _chain_leads(con, have: set[str]) -> list[tuple]:
-    if "peel_chain" not in have:
-        return []
-    rows = con.execute(
-        "SELECT chain_id, count(*), sum(remainder_sats), max(ts_us), min(txid) FROM peel_chain GROUP BY 1 ORDER BY 1"
-    ).fetchall()
-    return [
-        _row(
-            "CHAIN",
-            "chain",
-            chain_id,
-            0.45 + 0.08 * hops,
-            ["FLOW"],
-            [
-                {
-                    "family": "FLOW",
-                    "feature": "peel_hops",
-                    "value": hops,
-                    "contribution": round(0.08 * hops, 3),
-                    "text": f"{hops} consecutive transactions each pay out a small amount and pass the remainder on, the shape of a peeling chain.",
-                }
-            ],
-            int(value),
-            int(last),
-            f"Peeling chain of {hops} hops",
-            f"A {hops}-hop sequence starting at transaction {first[:10]} moves most of its value onward while peeling off small payments. This is a lead for review, not proof of wrongdoing.",
-        )
-        for chain_id, hops, value, last, first in rows
-    ]
-
-
-def _anomaly_leads(con, have: set[str]) -> list[tuple]:
-    if "anomaly" not in have:
-        return []
-    rows = con.execute(
-        "SELECT a.txid, a.score, x.in_sats, x.n_in, x.n_out, x.first_seen_us FROM anomaly a JOIN ds.tx x USING (txid) "
-        "WHERE a.score >= 0.97 ORDER BY a.score DESC, a.txid LIMIT 8"
-    ).fetchall()
-    return [
-        _row(
-            "TX",
-            "tx",
-            txid,
-            0.3 + 0.3 * (score - 0.97) / 0.03,
-            ["ANOM"],
-            [
-                {
-                    "family": "ANOM",
-                    "feature": "isolation_score",
-                    "value": round(score, 3),
-                    "contribution": round(score, 3),
-                    "text": f"An unsupervised model rates this transaction (inputs {n_in}, outputs {n_out}) as more unusual than {round(score * 100)}% of the dataset.",
-                }
-            ],
-            int(sats),
-            int(ts),
-            f"Statistically unusual transaction {txid[:10]}",
-            "The transaction's shape (value, fee rate, split) is atypical for this dataset. Unusual is not the same as illicit; treat as a lead for review.",
-        )
-        for txid, score, sats, n_in, n_out, ts in rows
-    ]
-
-
-def _taint_leads(con, have: set[str], taint_of: dict[str, float]) -> list[tuple]:
-    if not taint_of:
-        return []
-    seed_clusters = {
-        r[0]
-        for r in con.execute(
-            "SELECT DISTINCT c.cluster_id FROM cluster c JOIN taint t USING (address) WHERE t.is_seed"
-        ).fetchall()
+def priority_parts(
+    p: float, recv_btc: float, days_idle: float, actionable: bool, half_life: float
+) -> dict[str, float]:
+    """priority = p x value x recency x actionable (each factor is reported with the lead)."""
+    return {
+        "p": round(p, 4),
+        "value_factor": round(1 + math.log10(1 + max(recv_btc, 0.0)), 4),
+        "recency_factor": round(0.5 ** (max(days_idle, 0.0) / half_life), 4),
+        "actionable_factor": 1.25 if actionable else 1.0,
     }
-    out = []
-    for cluster_id, t in sorted(taint_of.items()):
-        if t < 0.2:
-            continue
-        seed = cluster_id in seed_clusters
-        n_addr, value = con.execute(
-            "SELECT count(*), coalesce((SELECT sum(o.sats) FROM ds.txout o JOIN cluster c2 ON c2.address = o.address WHERE c2.cluster_id = ?), 0) FROM cluster WHERE cluster_id = ?",
-            [cluster_id, cluster_id],
-        ).fetchone()
-        out.append(
-            _row(
-                "ACTOR",
-                "cluster",
-                cluster_id,
-                0.55 + 0.4 * t if not seed else 0.9,
-                ["TAINT", "FLOW"],
-                [
-                    {
-                        "family": "TAINT",
-                        "feature": "taint_share",
-                        "value": round(t, 3),
-                        "contribution": round(t, 3),
-                        "text": (
-                            "This wallet cluster contains a watchlisted seed address."
-                            if seed
-                            else f"About {round(t * 100)}% of this wallet cluster's value traces back to a watchlisted wallet through the ledger."
-                        ),
-                    }
-                ],
-                int(value),
-                None,
-                f"Wallet cluster {cluster_id[:10]} " + ("is a seed wallet" if seed else "holds traced funds"),
-                f"{n_addr} address(es) spent together. Risk reaches this cluster by value-weighted propagation from watchlisted wallets. Lead for review.",
-            )
-        )
-    return out
+
+
+def priority_of(parts: dict[str, float]) -> float:
+    return round(parts["p"] * parts["value_factor"] * parts["recency_factor"] * parts["actionable_factor"], 4)
+
+
+def detector_families(f: dict[str, float]) -> set[str]:
+    """Independent hits that count as evidence even when the model's contribution for the family is small."""
+    hits = set()
+    if f["top_ip_share"] >= 0.5 and f["mean_origin_p"] >= 0.3 and f["n_origin_ips"] >= 1:
+        hits.add("NET")
+    if f["peel_len_max"] >= 3 or f["is_cashout"] >= 1 or f["coinjoin_share"] >= 0.3:
+        hits.add("FLOW")
+    if f["taint_max"] >= 0.05:
+        hits.add("TAINT")
+    if f["tx_anom_max"] >= 0.98:
+        hits.add("ANOM")
+    return hits
 
 
 class RankStage:
     code = "E17"
     name = "rank leads"
-    requires = ("d_tx",)
-    produces = ("lead",)
+    requires = ("actor_features",)
+    produces = ("lead", "actor_scores")
 
     def run(self, ctx: RunContext) -> StageReport:
-        con = ctx.con
+        con, s = ctx.con, ctx.settings
+        if not available():
+            raise RunError("E17", "the lead ranker is not trained; run `sutradhar evals train-ranker`")
+        ranker = Ranker()
         con.execute(LEAD_DDL)
-        have = {r[0] for r in con.execute("SELECT table_name FROM information_schema.tables").fetchall()}
-        pairs = con.execute(PAIRS_SQL).fetchall() if {"origin", "cluster"} <= have else []
-        taint_of: dict[str, float] = {}
-        if {"taint", "cluster"} <= have:
-            taint_of = dict(
-                con.execute(
-                    "SELECT c.cluster_id, max(t.taint) FROM cluster c JOIN taint t USING (address) GROUP BY 1"
-                ).fetchall()
+        cols = ["cluster_id", *FEATURES]
+        rows = con.execute(f"SELECT {', '.join(cols)} FROM actor_features ORDER BY cluster_id").fetchall()  # noqa: S608  # nosec B608
+        ids = [r[0] for r in rows]
+        x = np.array([[float(v) for v in r[1:]] for r in rows], dtype=float).reshape(len(rows), len(FEATURES))
+        prob = ranker.prob(x) if len(rows) else np.zeros(0)
+        contrib = ranker.contributions(x) if len(rows) else np.zeros((0, len(FEATURES) + 1))
+        con.execute(
+            "CREATE TABLE actor_scores (cluster_id VARCHAR PRIMARY KEY, p DOUBLE NOT NULL, contrib VARCHAR NOT NULL)"
+        )
+        if rows:
+            con.executemany(
+                "INSERT INTO actor_scores VALUES (?, ?, ?)",
+                [
+                    (ids[i], float(prob[i]), json.dumps([round(float(v), 5) for v in contrib[i]]))
+                    for i in range(len(ids))
+                ],
             )
-        geo: dict[str, tuple] = {}
-        if "ip_geo" in have:
-            geo = {r[0]: r[1:] for r in con.execute("SELECT ip, country, asn, org FROM ip_geo").fetchall()}
-        out = []
-        for ip, cluster_id, n_tx, ps, value, last_us, n_addr, first_share in pairs:
-            p = 1 - math.prod(1 - min(0.999, float(q)) * WEAK_CALL for q in ps)
-            if p < MIN_P:
+        excluded = {
+            r[0]
+            for r in con.execute(
+                "SELECT cluster_id FROM service UNION SELECT cluster_id FROM victim"
+            ).fetchall()
+        }
+        stats = {
+            r[0]: r[1:]
+            for r in con.execute("SELECT cluster_id, recv_sats, last_us FROM cluster_stats").fetchall()
+        }
+        span_end = con.execute("SELECT coalesce(max(last_us), 0) FROM cluster_stats").fetchone()[0] or 0
+        seed_clusters = dict(
+            con.execute(
+                "SELECT DISTINCT c.cluster_id, t.category FROM taint t JOIN cluster c USING (address) WHERE t.is_seed"
+            ).fetchall()
+        )
+        leads: list[tuple] = []
+        actor_p: dict[str, float] = {}
+        for i, cid in enumerate(ids):
+            if cid in excluded or prob[i] < s.lead_min_p:
                 continue
-            tainted = taint_of.get(cluster_id, 0.0)
-            families = ["NET", "FLOW"]
-            extra = []
-            if tainted >= 0.05:
-                p = 1 - (1 - p) * (1 - 0.6 * tainted)
-                families.append("TAINT")
-                extra = [
+            f = dict(zip(FEATURES, x[i], strict=True))
+            fam_sum = {
+                fam: sum(contrib[i][j] for j, n in enumerate(FEATURES) if FEATURE_FAMILY[n] == fam)
+                for fam in FAMILIES
+            }
+            families = sorted(
+                {fam for fam, v in fam_sum.items() if v >= s.family_min_contrib} | detector_families(f)
+            )
+            if not families:
+                continue
+            recv_sats, last_us = stats.get(cid, (0, None))
+            days_idle = (span_end - (last_us or span_end)) / 8.64e10
+            actionable = (f["n_origin_ips"] >= 1 and f["mean_origin_p"] >= 0.3) or f["is_cashout"] >= 1
+            parts = priority_parts(
+                float(prob[i]), int(recv_sats) / 1e8, days_idle, actionable, s.recency_halflife_days
+            )
+            actor_p[cid] = float(prob[i])
+            leads.append(
+                (
+                    "ACTOR",
+                    "cluster",
+                    cid,
+                    round(float(prob[i]), 4),
+                    grade_for(float(prob[i]), len(families)),
+                    priority_of(parts),
+                    families,
+                    [],
+                    int(recv_sats),
+                    last_us,
+                    "",
+                    "",
+                    True,
+                    "lgbm+isotonic",
+                    ranker.version,
                     {
-                        "family": "TAINT",
-                        "feature": "taint_share",
-                        "value": round(tainted, 3),
-                        "contribution": round(0.6 * tainted, 3),
-                        "text": f"About {round(tainted * 100)}% of the value in this wallet cluster traces back to a watchlisted wallet.",
-                    }
-                ]
-            grade = _grade(p, n_tx)
-            subject = f"{ip}|{cluster_id}"
-            reasons = [
-                {
-                    "family": "NET",
-                    "feature": "origin_share",
-                    "value": n_tx,
-                    "contribution": round(p, 3),
-                    "text": f"This IP was the most likely first sender for {n_tx} transaction(s) spent by this wallet cluster.",
-                },
-                {
-                    "family": "FLOW",
-                    "feature": "cluster_size",
-                    "value": n_addr,
-                    "contribution": round(min(1.0, n_addr / 20), 3),
-                    "text": f"The wallet cluster groups {n_addr} address(es) spent together, so the link covers all of them.",
-                },
-                {
-                    "family": "NET",
-                    "feature": "sensors_heard",
-                    "value": round(float(first_share), 2),
-                    "contribution": round(min(1.0, float(first_share) / 5) * 0.5, 3),
-                    "text": f"This IP was heard first, on average by {round(float(first_share), 1)} sensor(s) per transaction.",
-                },
-                *extra,
-            ]
-            place = geo.get(ip)
-            if place and place[0]:
-                where = f"{place[0]}" + (f", AS{place[1]} {place[2]}" if place[1] else "")
-                reasons.append(
-                    {
-                        "family": "NET",
-                        "feature": "geoip",
-                        "value": place[0],
-                        "contribution": 0.0,
-                        "text": f"GeoIP places this IP in {where} (DB-IP Lite, 2026-09). Location context only; it does not change the score.",
-                    }
+                        "priority": parts,
+                        "fam_sum": {k: round(float(v), 3) for k, v in fam_sum.items()},
+                        **({"seed_hit": seed_clusters[cid] or "watchlist"} if cid in seed_clusters else {}),
+                    },
                 )
+            )
+        leads += self._cashout_leads(con, actor_p, ranker.version, stats)
+        leads += self._ip_leads(con, actor_p, ranker.version)
+        leads += self._chain_leads(con, actor_p)
+        leads += self._tx_leads(con)
+        leads.sort(key=lambda r: (-r[5], r[0], r[2]))
+        leads = leads[: s.lead_limit]
+        if leads:
+            con.executemany(
+                INSERT_SQL,
+                [
+                    (
+                        i,
+                        lead_key(r[0], r[1], r[2]),
+                        r[0],
+                        r[1],
+                        r[2],
+                        r[3],
+                        r[4],
+                        r[5],
+                        json.dumps(r[6]),
+                        json.dumps(r[7]),
+                        r[8],
+                        r[9],
+                        r[10],
+                        r[11],
+                        r[12],
+                        r[13],
+                        r[14],
+                        ctx.run_id,
+                        json.dumps(r[15]),
+                    )
+                    for i, r in enumerate(leads)
+                ],
+            )
+        by_type: dict[str, int] = {}
+        for r in leads:
+            by_type[r[0]] = by_type.get(r[0], 0) + 1
+        return StageReport(
+            rows={"lead": len(leads), **{f"lead_{k.lower()}": v for k, v in sorted(by_type.items())}}
+        )
+
+    # ── other lead types ──
+    @staticmethod
+    def _cashout_leads(con, actor_p: dict[str, float], version: str, stats: dict) -> list[tuple]:  # type: ignore[no-untyped-def]
+        out = []
+        for cid, service, sats, share, taint in con.execute(
+            "SELECT cluster_id, service_id, sats, share, taint FROM cashout ORDER BY 1, 2"
+        ).fetchall():
+            base = actor_p.get(cid, 0.0)
+            p = round(min(0.95, base * share + 0.05 * min(1.0, taint * 10)), 4)
+            if p < 0.1:
+                continue
+            last = stats.get(cid, (0, None))[1]
+            parts = priority_parts(p, int(sats) / 1e8, 0.0, True, 30.0)
             out.append(
                 (
-                    lead_key("ACTOR", "ip_cluster", subject),
-                    "ACTOR",
-                    "ip_cluster",
-                    subject,
-                    round(p, 4),
-                    grade,
-                    round(p * (1 + math.log10(1 + int(value) / 1e8)), 4),
-                    json.dumps(families),
-                    json.dumps(reasons),
-                    int(value),
-                    int(last_us) if last_us is not None else None,
-                    f"IP {ip} likely operates wallet cluster {cluster_id[:10]}",
-                    f"Evidence suggests {ip} may be the network origin of {n_tx} transaction(s) from a {n_addr}-address wallet cluster. This is a lead for review, not proof of identity.",
+                    "CASHOUT",
+                    "cashout",
+                    f"{cid}|{service}",
+                    p,
+                    "B" if p >= 0.5 else "C",
+                    priority_of(parts),
+                    ["FLOW", "TAINT"],
+                    [],
+                    int(sats),
+                    last,
+                    "",
+                    "",
+                    True,
+                    "cashout-from-actor",
+                    version,
+                    {"priority": parts, "share": share},
                 )
             )
-        out += _chain_leads(con, have) + _anomaly_leads(con, have) + _taint_leads(con, have, taint_of)
-        out.sort(key=lambda r: (-r[6], r[0]))
-        if out:
-            con.executemany(
-                "INSERT INTO lead VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [(i, *r, False, "evidence", MODEL_VERSION, ctx.run_id) for i, r in enumerate(out)],
+        return out
+
+    @staticmethod
+    def _ip_leads(con, actor_p: dict[str, float], version: str) -> list[tuple]:  # type: ignore[no-untyped-def]
+        by_ip: dict[str, list[tuple[str, float, int]]] = {}
+        for cid, ip, n_tx, _mean_p in con.execute(
+            "SELECT cluster_id, ip, n_tx, mean_p FROM actor_ip ORDER BY 1, 2"
+        ).fetchall():
+            if cid in actor_p and actor_p[cid] >= 0.3:
+                by_ip.setdefault(ip, []).append((cid, actor_p[cid], int(n_tx)))
+        out = []
+        for ip, linked in sorted(by_ip.items()):
+            if len(linked) < 2:
+                continue
+            p = round(1 - math.prod(1 - 0.7 * lp for _, lp, _ in linked), 4)
+            parts = priority_parts(p, 0.0, 0.0, True, 30.0)
+            out.append(
+                (
+                    "IP",
+                    "ip",
+                    ip,
+                    p,
+                    "B" if p >= 0.5 else "C",
+                    priority_of(parts),
+                    ["NET"],
+                    [],
+                    0,
+                    None,
+                    "",
+                    "",
+                    True,
+                    "noisy-or",
+                    version,
+                    {"priority": parts, "linked": [c for c, _, _ in linked]},
+                )
             )
-        return StageReport(rows={"lead": len(out)})
+        return out
+
+    @staticmethod
+    def _chain_leads(con, actor_p: dict[str, float]) -> list[tuple]:  # type: ignore[no-untyped-def]
+        """A peeling chain is only as suspicious as the wallet running it: the rule's score is blended with the owner's
+        ranker score, so fast sequential payers that merely look like a chain (bots, payroll) fall away."""
+        owner = dict(
+            con.execute(
+                "SELECT p.chain_id, min(c.cluster_id) FROM peel_chain p JOIN ds.txin i USING (txid) JOIN cluster c USING (address) GROUP BY 1"
+            ).fetchall()
+        )
+        out = []
+        for chain_id, hops, value, last, first in con.execute(
+            "SELECT chain_id, count(*), sum(remainder_sats), max(ts_us), min(txid) FROM peel_chain GROUP BY 1 ORDER BY 1"
+        ).fetchall():
+            rule = min(0.7, 0.35 + 0.08 * hops)
+            p = round(0.25 * rule + 0.75 * actor_p.get(owner.get(chain_id, ""), 0.0), 4)
+            if p < 0.2:
+                continue
+            parts = priority_parts(p, int(value) / 1e8, 0.0, False, 30.0)
+            reasons = [
+                {
+                    "family": "FLOW",
+                    "feature": "peel_hops",
+                    "label": "Peeling chain",
+                    "value": hops,
+                    "contribution": round(0.08 * hops, 3),
+                    "text": f"{hops} consecutive payments each send a small amount out and pass the remainder on, a pattern used to spread funds quickly.",
+                }
+            ]
+            out.append(
+                (
+                    "CHAIN",
+                    "chain",
+                    chain_id,
+                    p,
+                    "B" if p >= 0.5 else "C",
+                    priority_of(parts),
+                    ["FLOW"],
+                    reasons,
+                    int(value),
+                    int(last),
+                    f"Peeling chain of {hops} steps",
+                    f"Evidence suggests {hops} payments starting at transaction {first[:10]} may be one chain that spreads funds. Lead for review, not a finding about anyone.",
+                    False,
+                    "peel-traversal+owner",
+                    "rules@2",
+                    {"priority": parts, "owner": owner.get(chain_id)},
+                )
+            )
+        return out
+
+    @staticmethod
+    def _tx_leads(con) -> list[tuple]:  # type: ignore[no-untyped-def]
+        out = []
+        for txid, score, sats, n_in, n_out, ts in con.execute(
+            "SELECT a.txid, a.score, x.in_sats, x.n_in, x.n_out, x.first_seen_us FROM anomaly a JOIN ds.tx x USING (txid) "
+            "WHERE a.score >= 0.985 ORDER BY a.score DESC, a.txid LIMIT 8"
+        ).fetchall():
+            p = round(0.2 + 0.2 * (score - 0.985) / 0.015, 4)
+            parts = priority_parts(p, int(sats) / 1e8, 0.0, False, 30.0)
+            reasons = [
+                {
+                    "family": "ANOM",
+                    "feature": "isolation_score",
+                    "label": "Unusual payment",
+                    "value": round(score, 3),
+                    "contribution": round(score, 3),
+                    "text": f"A model rates this payment ({n_in} inputs, {n_out} outputs) as more unusual than {score * 100:.0f}% of the payments in the data.",
+                }
+            ]
+            out.append(
+                (
+                    "TX",
+                    "tx",
+                    txid,
+                    p,
+                    "C",
+                    priority_of(parts),
+                    ["ANOM"],
+                    reasons,
+                    int(sats),
+                    int(ts),
+                    f"Unusual payment {txid[:10]}",
+                    "Evidence suggests the shape of this payment (value, fee, split) is atypical for this data. Unusual does not mean illicit; treat it as a lead for review.",
+                    False,
+                    "isolation-forest",
+                    "iforest@1",
+                    {"priority": parts},
+                )
+            )
+        return out
 
 
 STAGE = RankStage()

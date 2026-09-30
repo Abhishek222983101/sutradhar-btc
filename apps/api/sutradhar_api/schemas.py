@@ -132,6 +132,7 @@ class LeadOut(Out):
 
 class LeadDetail(LeadOut):
     reasons: list[dict[str, Any]]
+    explanation: dict[str, Any] = {}
 
 
 class DatasetAccepted(BaseModel):
