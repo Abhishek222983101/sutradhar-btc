@@ -153,6 +153,14 @@ function Detail({ lead, runId }: { lead: Lead; runId: string }) {
               <h3 style={{ fontSize: 17, marginBottom: 8 }}>What would clear this</h3>
               <ul className="reasons">
                 {explain.counterfactual.map((c, i) => {
+                  if (c.p_before === c.p_after) {
+                    return (
+                      <li key={i}>
+                        Resetting <span className="mono">{c.feature}</span> to typical alone would not move the score — other evidence already
+                        holds it at the top confidence band ({pct(c.p_before)}).
+                      </li>
+                    );
+                  }
                   const [before, after] = pctPair(c.p_before, c.p_after);
                   return (
                     <li key={i}>If <span className="mono">{c.feature}</span> were typical, the score would move from {before} to {after}.</li>
