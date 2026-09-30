@@ -402,3 +402,15 @@ class Verification(Base):
     result: Mapped[dict[str, Any]]
     verified_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class AcademyAttempt(Base):
+    __tablename__ = "academy_attempts"
+    __table_args__ = (Index("ix_academy_attempts_challenge_id", "challenge_id", "score"),)
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    challenge_id: Mapped[str] = mapped_column(Text)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    answers: Mapped[dict[str, Any]]
+    score: Mapped[float] = mapped_column(Float)
+    duration_s: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
