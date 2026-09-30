@@ -91,15 +91,15 @@ change-address identification 95.2%; published CHAIN leads are 100% real peeling
 | P6.3 Lead detail tabs | ✅ | Why / Against this reading / What would clear this / priority breakdown |
 | P6.4 Investigate canvas | ✅ | client-side force-directed layout (no heavy graph library), bounded to the API's 150-node cap |
 | P6.5 Dossiers | ✅ | actor/address/tx/IP object pages + omnibox search, backend (`objects.py`) and a JSON-view frontend |
-| P6.6 Geo + Sankey | ⬜ cut | needs offline map tiles / a charting library; scope-cut per blueprint's own fallback order |
+| P6.6 Geo + Sankey | ✅ | hand-rolled offline SVG: `Sankey.tsx` (wallet value-flow) + `GeoBars.tsx` (origin-IP country distribution) — no charting lib, no map tiles, no network request |
 | P6.7 Cases, exports, verify | ✅ | full case workspace UI, evidence-pack/GraphML/MISP/i2csv export, `/verify` |
 | P6.8 Govern | ✅ | users, settings (with defaults + changed-marker), model cards, audit log, chain verify |
-| P6.9 i18n/accessibility | ⬜ cut | Hindi catalogue needs native-speaker review (blueprint's own requirement); scaffolding not started |
+| P6.9 i18n/accessibility | 🟡 | chrome-only Hindi scaffold (`i18n.ts`), opt-in toggle, English default; flagged pending native-speaker review per the blueprint's own requirement — not the full accessibility/states scope |
 | P7.1 Replay | ✅ | existed from P0.6, kept |
 | P7.2 Adversary/red-team | ⬜ cut | needs sweeps across many generated worlds; token/time-costly, cut |
 | P7.3 Feedback loop retrain | 🟡 | feedback API done (`triage.py`); no retrain→shadow→promote pipeline |
 | P7.4 Model registry UI | ✅ | Govern page shows model cards with metrics |
-| P7.5 Scenario Studio UI | ⬜ cut | CLI (`sutradhar gen run`) already does this; UI cut |
+| P7.5 Scenario Studio UI | ✅ | `ScenarioStudio.tsx`: read-only browser for the generator's presets (tiny/demo/rich/hard) with the exact CLI command for each; deliberately does not trigger generation server-side (resource-exhaustion risk on a public demo backend) |
 | P7.6 Academy | ✅ | one static challenge (blueprint's own scope-cut fallback), server-side scoring, leaderboard |
 | P7.7 Interop exports | ✅ | MISP, GraphML, i2csv (STIX cut per blueprint's own fallback order) |
 | P7.8–10 STRETCH | ⬜ cut | sensor planner, Elliptic++, GraphSAGE — explicitly stretch-only in the blueprint |
