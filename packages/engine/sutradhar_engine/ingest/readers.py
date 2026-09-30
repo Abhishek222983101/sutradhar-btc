@@ -9,10 +9,10 @@ import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from xml.etree.ElementTree import ParseError
 
 import polars as pl
 from defusedxml.common import DefusedXmlException
+from defusedxml.ElementTree import ParseError
 from defusedxml.ElementTree import iterparse as safe_iterparse
 
 from sutradhar_schemas.enums import FileFormat

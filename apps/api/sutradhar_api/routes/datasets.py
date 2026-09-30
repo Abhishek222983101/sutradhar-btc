@@ -30,6 +30,9 @@ from sutradhar_api.schemas import DatasetAccepted, DatasetDetail, DatasetFileOut
 from sutradhar_schemas.ids import new_id
 
 router = APIRouter(prefix="/api/v1", tags=["datasets"])
+_REJECT_COLS = 'file_id, row_no, rule, "field", value, message FROM rejects'
+REJECTS_SQL = f"SELECT {_REJECT_COLS} ORDER BY file_id, row_no, rule LIMIT ? OFFSET ?"  # nosec B608
+REJECTS_BY_RULE_SQL = f"SELECT {_REJECT_COLS} WHERE rule = ? ORDER BY file_id, row_no, rule LIMIT ? OFFSET ?"  # nosec B608
 FORMATS = {
     ".csv": "csv",
     ".tsv": "tsv",
@@ -304,11 +307,10 @@ def dataset_rejects(
     offset = after[0] if after else 0
     con = duckdb.connect(str(path), read_only=True)
     try:
-        where, params = ("WHERE rule = ?", [rule]) if rule else ("", [])
-        rows = con.execute(
-            f'SELECT file_id, row_no, rule, "field", value, message FROM rejects {where} ORDER BY file_id, row_no, rule LIMIT ? OFFSET ?',  # noqa: S608
-            [*params, limit + 1, offset],
-        ).fetchall()
+        if rule:
+            rows = con.execute(REJECTS_BY_RULE_SQL, [rule, limit + 1, offset]).fetchall()
+        else:
+            rows = con.execute(REJECTS_SQL, [limit + 1, offset]).fetchall()
     finally:
         con.close()
     more, rows = len(rows) > limit, rows[:limit]

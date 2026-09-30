@@ -11,7 +11,7 @@ import logging
 import os
 import queue
 import socket
-import subprocess
+import subprocess  # nosec B404 - runs only our own job module, fixed argv, no shell
 import sys
 import threading
 import time
@@ -92,7 +92,7 @@ class Worker:
         return {k: v for k, v in os.environ.items() if k.upper() not in drop}
 
     def _supervise(self, job: Claim, stop: threading.Event) -> Outcome:
-        proc = subprocess.Popen(
+        proc = subprocess.Popen(  # nosec B603  # noqa: S603 - fixed argv, no shell
             [sys.executable, "-m", "sutradhar_api.jobs.child"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,

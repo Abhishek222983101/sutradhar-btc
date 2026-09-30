@@ -30,7 +30,7 @@ class ChangeStage:
         con.execute(
             f"""INSERT INTO change SELECT txid, idx, 1 / (1 + exp(-z)) AS p FROM (
                     SELECT txid, idx, {model.logit_sql()} AS z FROM change_feat
-                    WHERE frac_of_input IS NOT NULL) """  # noqa: S608 - weights are floats from a JSON file
+                    WHERE frac_of_input IS NOT NULL) """  # noqa: S608  # nosec B608 - the SQL holds only float literals rendered with repr()
         )
         row = con.execute("SELECT count(*), count(*) FILTER (WHERE p >= 0.9) FROM change").fetchone()
         return StageReport(
