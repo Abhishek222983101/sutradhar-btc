@@ -147,3 +147,17 @@ fieldset legend { font-family: inherit; }
 input[type="radio"], input[type="checkbox"] { accent-color: var(--navy); width: 16px; height: 16px; vertical-align: middle; margin-right: 4px; }
 input[type="range"] { accent-color: var(--saffron); }
 .lead-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+
+.sankey { width: 100%; height: auto; border: 2px solid var(--ink); background: var(--card); margin: 8px 0; }
+.sankey-link { transition: opacity .12s; }
+.sankey-link:hover { opacity: 1 !important; }
+
+.geo-bars { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.geo-row { display: grid; grid-template-columns: 88px 1fr 48px; gap: 10px; align-items: center; font-size: 13px; }
+.geo-label { font-weight: 700; }
+.geo-track { background: #e4e7ee; border: 2px solid var(--ink); height: 14px; }
+.geo-fill { display: block; height: 100%; background: var(--navy); }
+.geo-val { color: var(--mute); text-align: right; }
+
+.lang-toggle { border: 2px solid var(--ink); background: var(--card); font-weight: 700; font-size: 13px; padding: 3px 9px; cursor: pointer; }
+.lang-toggle[aria-pressed="true"] { background: var(--saffron); }

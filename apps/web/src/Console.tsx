@@ -7,13 +7,14 @@ import Canvas from "./Canvas";
 import Dossier from "./Dossier";
 import PipelinePanel from "./PipelinePanel";
 import SearchBox from "./SearchBox";
+import { t, type Lang } from "./i18n";
 
 const TYPES = ["ALL", "ACTOR", "CHAIN", "TX"] as const;
 const NAMES: Record<string, string> = { ACTOR: "Wallet", CHAIN: "Peel chain", TX: "Unusual tx" };
 
 type Page<T> = { items: T[]; next_cursor: string | null };
 
-export default function Console({ home }: { home: () => void }) {
+export default function Console({ home, lang = "en" }: { home: () => void; lang?: Lang }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [type, setType] = useState<(typeof TYPES)[number]>("ALL");
   const [sel, setSel] = useState<Lead | null>(null);
@@ -38,7 +39,7 @@ export default function Console({ home }: { home: () => void }) {
   return (
     <div className="wrap console">
       <div className="panel">
-        <h2>Leads, most urgent first</h2>
+        <h2>{t(lang, "Leads, most urgent first")}</h2>
         <div style={{ padding: "10px 14px" }}>
           <SearchBox
             runId={runId}
@@ -78,7 +79,7 @@ export default function Console({ home }: { home: () => void }) {
         {dossier ? (
           <Dossier runId={runId} kind={dossier.kind} ref={dossier.ref} close={() => setDossier(null)} />
         ) : sel ? (
-          <Detail lead={sel} runId={runId} />
+          <Detail lead={sel} runId={runId} lang={lang} />
         ) : (
           <div className="panel empty">Select a lead, or search above.</div>
         )}
@@ -92,7 +93,7 @@ export default function Console({ home }: { home: () => void }) {
 
 type Explanation = { reasons: { family: string; feature: string; text: string; contribution: number }[]; opposing: { text: string }[]; counterfactual: { feature: string; p_after: number; p_before: number }[]; priority: Record<string, number> };
 
-function Detail({ lead, runId }: { lead: Lead; runId: string }) {
+function Detail({ lead, runId, lang }: { lead: Lead; runId: string; lang: Lang }) {
   const [full, setFull] = useState<Lead | null>(null);
   const [ev, setEv] = useState<Evidence | null>(null);
   const [explain, setExplain] = useState<Explanation | null>(null);
@@ -129,13 +130,13 @@ function Detail({ lead, runId }: { lead: Lead; runId: string }) {
             {lead.value_at_risk_sats > 0 && <div><b>{btc(lead.value_at_risk_sats)} BTC</b><div className="note">value involved</div></div>}
             <div className="lead-actions">
               {lead.subject_kind === "cluster" && <button className="chip" onClick={() => setShowCanvas((v) => !v)}>{showCanvas ? "Hide" : "Investigate"} graph</button>}
-              <button className="chip" onClick={() => void addToCase()}>Add to case</button>
+              <button className="chip" onClick={() => void addToCase()}>{t(lang, "Add to case")}</button>
             </div>
           </div>
           {caseMsg && <p className="note">{caseMsg}</p>}
           <p className="hedge">{lead.summary}</p>
           <div>
-            <h3 style={{ fontSize: 17, marginBottom: 8 }}>Why this was flagged</h3>
+            <h3 style={{ fontSize: 17, marginBottom: 8 }}>{t(lang, "Why this was flagged")}</h3>
             <ul className="reasons">
               {(full?.reasons ?? []).map((r) => (
                 <li key={r.feature}>{r.text}<small className="mono">{r.family} · {r.feature} · weight {r.contribution}</small></li>
@@ -144,13 +145,13 @@ function Detail({ lead, runId }: { lead: Lead; runId: string }) {
           </div>
           {explain && explain.opposing.length > 0 && (
             <div>
-              <h3 style={{ fontSize: 17, marginBottom: 8 }}>Against this reading</h3>
+              <h3 style={{ fontSize: 17, marginBottom: 8 }}>{t(lang, "Against this reading")}</h3>
               <ul className="reasons">{explain.opposing.map((o, i) => <li key={i}>{o.text}</li>)}</ul>
             </div>
           )}
           {explain && explain.counterfactual.length > 0 && (
             <div>
-              <h3 style={{ fontSize: 17, marginBottom: 8 }}>What would clear this</h3>
+              <h3 style={{ fontSize: 17, marginBottom: 8 }}>{t(lang, "What would clear this")}</h3>
               <ul className="reasons">
                 {explain.counterfactual.map((c, i) => {
                   if (c.p_before === c.p_after) {

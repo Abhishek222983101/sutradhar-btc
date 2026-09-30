@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, role } from "./api";
+import { t, type Lang } from "./i18n";
 
 type Model = { name: string; version: string; metrics: Record<string, number>; trained_on: Record<string, unknown> };
 type Setting = { key: string; value: unknown; default: unknown; changed: boolean };
@@ -10,7 +11,7 @@ const formatMetric = (v: unknown): string => {
   return Number.isInteger(v) ? v.toLocaleString() : v.toFixed(3);
 };
 
-export default function Govern() {
+export default function Govern({ lang = "en" }: { lang?: Lang } = {}) {
   const [models, setModels] = useState<Model[]>([]);
   const [settings, setSettings] = useState<Setting[]>([]);
   const [audit, setAudit] = useState<AuditRow[] | null>(null);
@@ -27,12 +28,12 @@ export default function Govern() {
   return (
     <div className="wrap">
       <section style={{ paddingTop: 32 }}>
-        <h2 className="section-title">Govern</h2>
+        <h2 className="section-title">{t(lang, "Govern")}</h2>
         <p className="note">Models, thresholds and the audit trail — everything a decision in this system rests on.</p>
       </section>
 
       <section style={{ marginTop: 8 }}>
-        <h3 style={{ fontSize: 18, marginBottom: 10 }}>Model registry</h3>
+        <h3 style={{ fontSize: 18, marginBottom: 10 }}>{t(lang, "Model registry")}</h3>
         <p className="small-note">Row/actor counts are training-set sizes, not scores — see docs/EVAL.md for held-out accuracy.</p>
         <div className="board">
           {models.map((m) => (
@@ -54,7 +55,7 @@ export default function Govern() {
       </section>
 
       <section style={{ marginTop: 28 }}>
-        <h3 style={{ fontSize: 18, marginBottom: 10 }}>Audit chain</h3>
+        <h3 style={{ fontSize: 18, marginBottom: 10 }}>{t(lang, "Audit chain")}</h3>
         {!["lead", "admin", "auditor"].includes(role() ?? "") ? (
           <p className="small-note">Chain verification needs a lead analyst, admin or auditor role.</p>
         ) : verify ? (
@@ -69,7 +70,7 @@ export default function Govern() {
       <section className="two-col" style={{ marginTop: 24, alignItems: "stretch" }}>
         <div className="panel">
           <h2>
-            Settings <span className="note" style={{ fontWeight: 400 }}>({changed} changed from default)</span>
+            {t(lang, "Settings")} <span className="note" style={{ fontWeight: 400 }}>({changed} changed from default)</span>
           </h2>
           <div className="body" style={{ maxHeight: 420, overflow: "auto" }}>
             <table className="data-table">
@@ -94,7 +95,7 @@ export default function Govern() {
         </div>
 
         <div className="panel">
-          <h2>Recent activity</h2>
+          <h2>{t(lang, "Recent activity")}</h2>
           <div className="body" style={{ maxHeight: 420, overflow: "auto" }}>
             {!["lead", "admin", "auditor"].includes(role() ?? "") ? (
               <p className="small-note">Audit access needs a lead analyst, admin or auditor role — you're signed in as {role() ?? "a visitor"}.</p>

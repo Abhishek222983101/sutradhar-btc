@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { t, type Lang } from "./i18n";
 
 type Case = { id: string; title: string; status: string; summary: string | null };
 type Item = { id: string; item_kind: string; ref: string; note: string | null };
@@ -13,7 +14,7 @@ const EXPORT_LABELS: Record<string, string> = {
   i2csv: "i2 CSV",
 };
 
-export default function Cases({ runId }: { runId: string }) {
+export default function Cases({ runId, lang = "en" }: { runId: string; lang?: Lang }) {
   const [cases, setCases] = useState<Case[]>([]);
   const [active, setActive] = useState<Case | null>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -61,13 +62,13 @@ export default function Cases({ runId }: { runId: string }) {
   return (
     <div className="wrap console">
       <div className="panel">
-        <h2>Cases</h2>
+        <h2>{t(lang, "Cases")}</h2>
         <div className="upload">
           <div className="form-row" style={{ marginBottom: 0 }}>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New case title (3+ characters)" />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t(lang, "New case title (3+ characters)")} />
           </div>
           <button className="btn" onClick={() => void createCase()}>
-            Create case
+            {t(lang, "Create case")}
           </button>
         </div>
         <div className="leads">
@@ -118,13 +119,13 @@ export default function Cases({ runId }: { runId: string }) {
                     <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3} placeholder="Add a note for the case file…" />
                   </div>
                   <button className="btn" onClick={() => void addNote()}>
-                    Add note
+                    {t(lang, "Add note")}
                   </button>
                 </div>
               </div>
             </div>
             <div className="panel">
-              <h2>Export evidence</h2>
+              <h2>{t(lang, "Export evidence")}</h2>
               <div className="body">
                 <div className="chips">
                   {Object.entries(EXPORT_LABELS).map(([k, label]) => (

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import { btc, ist, pct, short } from "./format";
+import Sankey from "./Sankey";
+import GeoBars from "./GeoBars";
 
 type Row = Record<string, unknown>;
 
@@ -127,6 +129,7 @@ function ActorView({ d }: { d: Row }) {
       {(d.partners as Row[])?.length > 0 && (
         <>
           <h3 style={{ fontSize: 16 }}>Value flow partners</h3>
+          <Sankey partners={d.partners as Row[]} />
           <ul className="reasons">
             {(d.partners as Row[]).slice(0, 8).map((p, i) => (
               <li key={i}>
@@ -197,7 +200,8 @@ function TxView({ d }: { d: Row }) {
       {d.motif && <p className="note">Motif: {d.motif as string}</p>}
       {origin.length > 0 && (
         <>
-          <h3 style={{ fontSize: 16 }}>Candidate origin IPs</h3>
+          <h3 style={{ fontSize: 16 }}>Candidate origin IPs, by country</h3>
+          <GeoBars origins={origin as Row[]} />
           <ul className="reasons">
             {origin.slice(0, 5).map((o, i) => (
               <li key={i}>

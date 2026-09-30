@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { t, type Lang } from "./i18n";
 
 type Question = { id: string; text: string; options: string[]; kind: string };
 type Challenge = { id: string; title: string; time_limit_s: number; questions: Question[] };
 
-export default function Academy() {
+export default function Academy({ lang = "en" }: { lang?: Lang } = {}) {
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [started, setStarted] = useState<number | null>(null);
@@ -34,7 +35,7 @@ export default function Academy() {
         </p>
         {!started && (
           <button className="btn primary" onClick={() => setStarted(Date.now())}>
-            Start
+            {t(lang, "Start")}
           </button>
         )}
       </section>
@@ -42,7 +43,7 @@ export default function Academy() {
       {started && !result && (
         <div className="panel" style={{ maxWidth: 720, marginTop: 20 }}>
           <h2>
-            Questions <span className="note" style={{ fontWeight: 400 }}>({answered} of {challenge.questions.length} answered)</span>
+            {t(lang, "Questions")} <span className="note" style={{ fontWeight: 400 }}>({answered} of {challenge.questions.length} answered)</span>
           </h2>
           <div className="body">
             {challenge.questions.map((q, i) => (
@@ -58,7 +59,7 @@ export default function Academy() {
               </fieldset>
             ))}
             <button className="btn primary" onClick={() => void submit()} disabled={answered < challenge.questions.length}>
-              Submit
+              {t(lang, "Submit")}
             </button>
           </div>
         </div>
@@ -66,7 +67,7 @@ export default function Academy() {
 
       {result && (
         <div className="panel" style={{ maxWidth: 720, marginTop: 20 }}>
-          <h2>Result</h2>
+          <h2>{t(lang, "Result")}</h2>
           <div className="body">
             <div className="big-p">{Math.round(result.score * 100)}%</div>
             <p className="note">Try again, or head back to the console to look closer at any lead you weren't sure about.</p>

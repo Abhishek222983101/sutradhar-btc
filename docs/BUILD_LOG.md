@@ -108,7 +108,7 @@ change-address identification 95.2%; published CHAIN leads are 100% real peeling
 | P8.3 Air-gap installer | ✅ | install/selfcheck/backup/restore/upgrade/uninstall, tested end to end against a live stack |
 | P8.4 Offline verification suite | ✅ | already in CI (`--network none` job) |
 | P8.5 Demo hardening | ✅ | TTL purge, rate limits, upload caps — done in P0 |
-| P8.6 Documentation | 🟡 | write-up + security pass + pitch outline done; no PDF render |
+| P8.6 Documentation | ✅ | write-up + security pass + pitch outline + rendered PDF (`docs/TECHNICAL_WRITEUP.pdf`, visually verified) |
 | P8.7 Backup/restore drill | ✅ | scripted and verified live (audit chain intact after restore) |
-| P8.8 Release v1.0.0 | ⬜ | no git tag cut yet |
+| P8.8 Release v1.0.0 | ✅ | git tag `v1.0.0` pushed, GitHub Release cut with PDF + EVAL.md attached |
 | P9.1–9.5 | 🟡 | pitch outline written; no video, no physical contingency kit (human/logistics tasks) |
