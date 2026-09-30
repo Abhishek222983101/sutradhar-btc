@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { btc, ist, pct, short } from "./format";
+import { btc, ist, pct, pctPair, short } from "./format";
 
 describe("format", () => {
   it("converts satoshis to BTC without floating-point surprises", () => {
@@ -19,5 +19,9 @@ describe("format", () => {
   it("shortens long ids only", () => {
     expect(short("abcdefghijklmnop")).toBe("abcdefghij…");
     expect(short("abc")).toBe("abc");
+  });
+  it("distinguishes close percentages that would otherwise round to the same value", () => {
+    expect(pctPair(0.999, 0.998)).toEqual(["99.9%", "99.8%"]);
+    expect(pctPair(0.41, 0.62)).toEqual(["41%", "62%"]);
   });
 });

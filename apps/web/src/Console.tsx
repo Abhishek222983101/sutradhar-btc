@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Evidence, type Lead } from "./api";
 import DataPanel from "./DataPanel";
-import { btc, pct } from "./format";
+import { btc, pct, pctPair } from "./format";
 import LinkGraph from "./LinkGraph";
 import Canvas from "./Canvas";
 import Dossier from "./Dossier";
@@ -152,9 +152,12 @@ function Detail({ lead, runId }: { lead: Lead; runId: string }) {
             <div>
               <h3 style={{ fontSize: 17, marginBottom: 8 }}>What would clear this</h3>
               <ul className="reasons">
-                {explain.counterfactual.map((c, i) => (
-                  <li key={i}>If <span className="mono">{c.feature}</span> were typical, the score would move from {pct(c.p_before)} to {pct(c.p_after)}.</li>
-                ))}
+                {explain.counterfactual.map((c, i) => {
+                  const [before, after] = pctPair(c.p_before, c.p_after);
+                  return (
+                    <li key={i}>If <span className="mono">{c.feature}</span> were typical, the score would move from {before} to {after}.</li>
+                  );
+                })}
               </ul>
             </div>
           )}

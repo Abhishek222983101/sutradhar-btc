@@ -1,19 +1,24 @@
 import { useEffect, useState } from "react";
-import { api } from "./api";
+import { api, role } from "./api";
 
 type Model = { name: string; version: string; metrics: Record<string, number>; trained_on: Record<string, unknown> };
 type Setting = { key: string; value: unknown; default: unknown; changed: boolean };
 type AuditRow = { seq: number; ts: string; actor_role: string; action: string; target_kind: string; target_ref: string };
 
+const formatMetric = (v: unknown): string => {
+  if (typeof v !== "number") return String(v);
+  return Number.isInteger(v) ? v.toLocaleString() : v.toFixed(3);
+};
+
 export default function Govern() {
   const [models, setModels] = useState<Model[]>([]);
   const [settings, setSettings] = useState<Setting[]>([]);
-  const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [audit, setAudit] = useState<AuditRow[] | null>(null);
   const [verify, setVerify] = useState<{ ok: boolean; entries: number } | null>(null);
   useEffect(() => {
     void api<Model[]>("/api/v1/models").then(setModels).catch(() => undefined);
     void api<Setting[]>("/api/v1/settings").then(setSettings).catch(() => undefined);
-    void api<{ items: AuditRow[] }>("/api/v1/audit?limit=30").then((p) => setAudit(p.items)).catch(() => undefined);
+    void api<{ items: AuditRow[] }>("/api/v1/audit?limit=30").then((p) => setAudit(p.items)).catch(() => setAudit([]));
     void api<{ ok: boolean; entries: number }>("/api/v1/audit/verify").then(setVerify).catch(() => undefined);
   }, []);
 
@@ -28,6 +33,7 @@ export default function Govern() {
 
       <section style={{ marginTop: 8 }}>
         <h3 style={{ fontSize: 18, marginBottom: 10 }}>Model registry</h3>
+        <p className="small-note">Row/actor counts are training-set sizes, not scores — see docs/EVAL.md for held-out accuracy.</p>
         <div className="board">
           {models.map((m) => (
             <article className="req" key={m.name}>
@@ -38,7 +44,7 @@ export default function Govern() {
               <p>
                 {Object.entries(m.metrics)
                   .slice(0, 3)
-                  .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "number" ? v.toFixed(3) : v}`)
+                  .map(([k, v]) => `${k.replace(/_/g, " ")}: ${formatMetric(v)}`)
                   .join(" · ") || "No held-out metrics recorded for this model."}
               </p>
             </article>
@@ -49,10 +55,14 @@ export default function Govern() {
 
       <section style={{ marginTop: 28 }}>
         <h3 style={{ fontSize: 18, marginBottom: 10 }}>Audit chain</h3>
-        {verify && (
+        {!["lead", "admin", "auditor"].includes(role() ?? "") ? (
+          <p className="small-note">Chain verification needs a lead analyst, admin or auditor role.</p>
+        ) : verify ? (
           <p className={verify.ok ? "hedge" : "err"}>
             {verify.ok ? "✓ Verified" : "✗ BROKEN"} — {verify.entries} entries, recomputed from scratch on every check.
           </p>
+        ) : (
+          <p className="small-note">Verifying…</p>
         )}
       </section>
 
@@ -86,18 +96,25 @@ export default function Govern() {
         <div className="panel">
           <h2>Recent activity</h2>
           <div className="body" style={{ maxHeight: 420, overflow: "auto" }}>
-            <ul className="reasons">
-              {audit.map((a) => (
-                <li key={a.seq}>
-                  <span className="mono">#{a.seq}</span> {a.action.replace(/\./g, " · ")} on {a.target_kind}:
-                  {a.target_ref.slice(0, 18)}
-                  <small>
-                    {a.actor_role} · {new Date(a.ts).toLocaleString()}
-                  </small>
-                </li>
-              ))}
-              {audit.length === 0 && <li className="note">No audit entries yet.</li>}
-            </ul>
+            {!["lead", "admin", "auditor"].includes(role() ?? "") ? (
+              <p className="small-note">Audit access needs a lead analyst, admin or auditor role — you're signed in as {role() ?? "a visitor"}.</p>
+            ) : audit === null ? (
+              <p className="small-note">Loading…</p>
+            ) : audit.length === 0 ? (
+              <p className="small-note">No audit entries yet.</p>
+            ) : (
+              <ul className="reasons">
+                {audit.map((a) => (
+                  <li key={a.seq}>
+                    <span className="mono">#{a.seq}</span> {a.action.replace(/\./g, " · ")} on {a.target_kind}:
+                    {a.target_ref.slice(0, 18)}
+                    <small>
+                      {a.actor_role} · {new Date(a.ts).toLocaleString()}
+                    </small>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </section>
