@@ -26,10 +26,18 @@ from sutradhar_gen.export import (
 )
 from sutradhar_gen.lookalikes import setup_lookalikes
 from sutradhar_gen.network import Topology, build_topology
-from sutradhar_gen.observe import ObservationLog, VantageObserver, origin_observable
+from sutradhar_gen.observe import (
+    FlowObserver,
+    ObservationLog,
+    Observer,
+    SingleObserver,
+    VantageObserver,
+    origin_observable,
+)
 from sutradhar_gen.ops import DarknetState, RansomwareState, setup_coinjoin, setup_darknet, setup_ransomware
 from sutradhar_gen.propagate import build_edges, propagate
 from sutradhar_gen.world import World
+from sutradhar_schemas.enums import ObservationModel
 
 _WRITERS = {
     "csv": (write_canonical_csv, "traffic.csv"),
@@ -59,12 +67,20 @@ def generate(cfg: ScenarioConfig, seed: int, out: Path, fmt: str = "csv") -> dic
         if not tx.is_coinbase and tx.ts_us >= world.t_export and tx.origin_node is not None
     ]
     edges = build_edges(topo, cfg.network)
-    observer = VantageObserver(topo, edges, cfg.observation)
+    model = cfg.observation.model
+    observers: list[Observer] = []
+    if model in (ObservationModel.VANTAGE, ObservationModel.MIXED):
+        observers.append(VantageObserver(topo, edges, cfg.observation))
+    if model in (ObservationModel.FLOW, ObservationModel.MIXED):
+        observers.append(FlowObserver(topo, edges, cfg.observation, world.rng["observation"]))
+    if model == ObservationModel.SINGLE:
+        observers.append(SingleObserver(topo, edges))
     log = ObservationLog()
     rng = world.rng["propagation"]
     for i, tx in enumerate(exported):
         prop = propagate(edges, tx.origin_node, cfg.network, rng)  # type: ignore[arg-type]
-        observer.observe(i, tx.ts_us, prop, log)
+        for observer in observers:
+            observer.observe(i, tx.ts_us, prop, log)
 
     if fmt not in _WRITERS:
         raise ValueError(f"unknown format {fmt!r}; choose from {sorted(_WRITERS)}")

@@ -155,6 +155,12 @@ class ObservationCfg(_Cfg):
     log_first_k: int = Field(
         default=5, ge=1, le=64, description="Each sensor logs the first k announcers per tx"
     )
+    flow_edge_coverage: float = Field(
+        default=0.15,
+        gt=0,
+        le=1,
+        description="FLOW/MIXED only: the fraction of ordinary P2P links an instrumented ISP happens to carry",
+    )
 
 
 class ScenarioConfig(_Cfg):

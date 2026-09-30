@@ -21,9 +21,9 @@ Legend: ✅ done · 🟡 done with a known gap
 | P1.3 CoinJoin | ✅ | Whirlpool-style equal-output rounds (one denomination) |
 | P1.4 Illicit operations | ✅ | ransomware with peeling chain, darknet market with vendors |
 | P1.5 P2P propagation | ✅ | Bitcoin-style diffusion delays |
-| P1.6 Observation models | 🟡 | sensor (vantage) model only; flow-record model is detected but not generated — a genuinely different simulation (ISP-level flow between arbitrary peer pairs, not sensor listen-points), left for a dedicated pass |
+| P1.6 Observation models | ✅ | `ObservationCfg.model`: VANTAGE (unchanged default), FLOW (per-transaction, per-destination sampling — real NetFlow-style, not a fixed "instrumented link" that would eventually see ~100% of traffic on this backbone topology), MIXED, SINGLE — all four proven to round-trip through `detect_observation_model` as themselves (`test_observation_models.py`) |
 | P1.7 Truth and exporters | ✅ | `gen run --format {csv,json,ndjson,xml}`; all four proven byte-identical after ingest (`test_export_formats.py`) |
-| P1.8 Scenario packs | 🟡 | `tiny`, `demo`, `rich`, `hard`; no randomised scenario distribution or realism report — left for a dedicated pass |
+| P1.8 Scenario packs | ✅ | `sutradhar gen randomize --count N --seed-base S` (blueprint §5.11, scoped to the knobs this generator has — economy/network/lookalikes/time, not NAT/Tor/VPN which aren't simulated); `sutradhar gen validate <world>` realism report against the blueprint's own §5.12 target bands, flagged not fatal |
 | P2.1 Readers | ✅ | CSV, TSV, JSON, NDJSON, XML (entity-safe); compressed input not supported |
 | P2.2 Mapping, auto-mapper | ✅ | built-in profiles per format; `--auto-map` with per-field confidence |
 | P2.3 Normalisation | ✅ | exact amounts and times |

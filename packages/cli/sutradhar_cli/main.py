@@ -87,6 +87,57 @@ def gen_run(
     )
 
 
+@gen_app.command("randomize")
+def gen_randomize(
+    count: Annotated[int, typer.Option(help="How many domain-randomised worlds to generate.")] = 40,
+    seed_base: Annotated[int, typer.Option(help="First seed; each world gets seed_base + i.")] = 1000,
+    out: Annotated[Path, typer.Option(help="Output directory; each world lands in OUT/w<i>.")] = Path(
+        "worlds/train"
+    ),
+    scenario: Annotated[str, typer.Option(help="Base preset each variant randomises around.")] = "rich",
+    fmt: Annotated[str, typer.Option("--format", help="Output format: csv, json, ndjson or xml.")] = "csv",
+) -> None:
+    """Domain-randomised worlds (blueprint §5.11): every world samples its own parameters around `scenario`,
+    so a model trained across the batch learns invariances instead of one fixed configuration."""
+    from sutradhar_gen.config import PRESETS
+    from sutradhar_gen.generate import generate
+    from sutradhar_gen.randomize import randomized_scenarios
+
+    if scenario not in PRESETS:
+        raise typer.BadParameter(f"unknown scenario {scenario!r}; choose from {sorted(PRESETS)}")
+    if fmt not in {"csv", "json", "ndjson", "xml"}:
+        raise typer.BadParameter(f"unknown format {fmt!r}; choose from csv, json, ndjson, xml")
+    for i, (seed, cfg) in enumerate(randomized_scenarios(PRESETS[scenario], count, seed_base)):
+        summary = generate(cfg, seed, out / f"w{i}", fmt=fmt)
+        counts = summary["counts"]
+        typer.echo(f"w{i} (seed {seed}): {counts['txs_exported']} tx, {cfg.economy.users} users")
+    typer.echo(f"{count} randomised worlds -> {out}")
+
+
+@gen_app.command("validate")
+def gen_validate(
+    world: Annotated[
+        Path, typer.Argument(help="A world directory produced by `gen run` or `gen randomize`.")
+    ],
+) -> None:
+    """Realism report (blueprint §5.12): how this world's own statistics compare to the target bands.
+    Flagged, not fatal — realism is a spectrum."""
+    import json
+
+    from sutradhar_gen.config import ScenarioConfig
+    from sutradhar_gen.realism import format_report, realism_report
+
+    info = json.loads((world / "world.json").read_text(encoding="utf-8"))
+    cfg = ScenarioConfig.model_validate(info["scenario"])
+    data_files = list((world / "data").glob("traffic.*"))
+    fmt = data_files[0].suffix.lstrip(".") if data_files else "csv"
+    checks = realism_report(world, cfg, fmt=fmt)
+    typer.echo(format_report(checks, cfg.name, info["seed"]))
+    flagged = sum(1 for c in checks if c.in_band is False)
+    if flagged:
+        typer.echo(f"{flagged} check(s) flagged (not fatal) — see the table above.")
+
+
 @app.command()
 def ingest(
     files: Annotated[
