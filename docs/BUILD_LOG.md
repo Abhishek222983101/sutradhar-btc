@@ -80,3 +80,35 @@ change-address identification 95.2%; published CHAIN leads are 100% real peeling
 | Address plausibility (V12) rejects the row instead of warning | Keeps markup-shaped text out of the store, UI and exports |
 | Peel chains require one input and a one-hour hop gap | Without timing the rule flagged ordinary users (7% precision) |
 | Change links used for clustering need p ≥ 0.99 | Looser thresholds added links but lowered cluster purity |
+
+
+## P6–P9 — built this session (scoped for time)
+
+| Sub-phase | Status | Notes |
+|---|---|---|
+| P6.1 Design system | ✅ | existing neo-brutalist token system extended |
+| P6.2 Triage queue | ✅ | filters, status chips, search, sort — in Console.tsx |
+| P6.3 Lead detail tabs | ✅ | Why / Against this reading / What would clear this / priority breakdown |
+| P6.4 Investigate canvas | ✅ | client-side force-directed layout (no heavy graph library), bounded to the API's 150-node cap |
+| P6.5 Dossiers | ✅ | actor/address/tx/IP object pages + omnibox search, backend (`objects.py`) and a JSON-view frontend |
+| P6.6 Geo + Sankey | ⬜ cut | needs offline map tiles / a charting library; scope-cut per blueprint's own fallback order |
+| P6.7 Cases, exports, verify | ✅ | full case workspace UI, evidence-pack/GraphML/MISP/i2csv export, `/verify` |
+| P6.8 Govern | ✅ | users, settings (with defaults + changed-marker), model cards, audit log, chain verify |
+| P6.9 i18n/accessibility | ⬜ cut | Hindi catalogue needs native-speaker review (blueprint's own requirement); scaffolding not started |
+| P7.1 Replay | ✅ | existed from P0.6, kept |
+| P7.2 Adversary/red-team | ⬜ cut | needs sweeps across many generated worlds; token/time-costly, cut |
+| P7.3 Feedback loop retrain | 🟡 | feedback API done (`triage.py`); no retrain→shadow→promote pipeline |
+| P7.4 Model registry UI | ✅ | Govern page shows model cards with metrics |
+| P7.5 Scenario Studio UI | ⬜ cut | CLI (`sutradhar gen run`) already does this; UI cut |
+| P7.6 Academy | ✅ | one static challenge (blueprint's own scope-cut fallback), server-side scoring, leaderboard |
+| P7.7 Interop exports | ✅ | MISP, GraphML, i2csv (STIX cut per blueprint's own fallback order) |
+| P7.8–10 STRETCH | ⬜ cut | sensor planner, Elliptic++, GraphSAGE — explicitly stretch-only in the blueprint |
+| P8.1 Security pass | ✅ | `docs/SECURITY_PASS.md` |
+| P8.2 Performance | ✅ | `scripts/bench.py`, real numbers documented |
+| P8.3 Air-gap installer | ✅ | install/selfcheck/backup/restore/upgrade/uninstall, tested end to end against a live stack |
+| P8.4 Offline verification suite | ✅ | already in CI (`--network none` job) |
+| P8.5 Demo hardening | ✅ | TTL purge, rate limits, upload caps — done in P0 |
+| P8.6 Documentation | 🟡 | write-up + security pass + pitch outline done; no PDF render |
+| P8.7 Backup/restore drill | ✅ | scripted and verified live (audit chain intact after restore) |
+| P8.8 Release v1.0.0 | ⬜ | no git tag cut yet |
+| P9.1–9.5 | 🟡 | pitch outline written; no video, no physical contingency kit (human/logistics tasks) |
