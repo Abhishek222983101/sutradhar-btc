@@ -185,11 +185,15 @@ def get_lead(lead_id: str, principal: Annotated[Principal, require(Action.VIEW)]
 
 
 @router.get("/eval")
-def hero_eval(principal: Annotated[Principal, require(Action.VIEW)]) -> dict[str, Any]:
-    """Measured accuracy of the origin and clustering stages on the synthetic world with hidden ground truth."""
-    from sutradhar_api.demo_seed import HERO_EVAL
+def hero_eval() -> dict[str, Any]:
+    """Measured accuracy against hidden ground truth (docs/EVAL.json, produced by `sutradhar evals report`)."""
+    import json
 
-    return HERO_EVAL
+    from sutradhar_api.demo_seed import EVAL_JSON
+
+    if not EVAL_JSON.exists():
+        raise Problem(404, "not_found", "no evaluation report has been generated")
+    return json.loads(EVAL_JSON.read_text(encoding="utf-8"))
 
 
 @router.get("/leads/{lead_id}/evidence")

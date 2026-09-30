@@ -61,4 +61,7 @@ export type Evidence = {
   transactions: { txid: string; sats: number; candidates: { ip: string; p: number }[]; arrivals: { from: string; sensor: string; dt_ms: number }[] }[];
 };
 export type Info = { mode: string; version: string; database: string; offline_guard: { mode: string; active: boolean; blocked_attempts: number } };
-export type Eval = Record<string, number | string>;
+export type Eval = { seeds: number[]; origin_top1_mean: number; origin_top3_mean: number; origin_random_baseline_mean: number; wallet_cluster_purity_mean: number; observable_transactions_total: number };
+export type Dataset = { id: string; name: string; status: string; row_count: number | null; reject_count: number | null; xray: XRay | null };
+export type XRay = { rows: number; txs: number; addresses: number; ips: number; network: { observation_model: string; sensors_inferred: number; distinct_src_ips: number; obs_per_tx_p50: number }; quality: Record<string, number>; enabled_stages: string[]; disabled_features: string[]; warnings: string[] };
+export type Reject = { file_id: string; row_no: number; rule: string; field: string | null; value: string | null; message: string };

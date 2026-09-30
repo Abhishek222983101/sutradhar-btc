@@ -28,16 +28,7 @@ from sutradhar_schemas.canonical import sha256_file
 log = logging.getLogger("sutradhar.demo")
 HERO = Path(__file__).parent / "demo" / "hero_traffic.csv"
 HERO_DATASET, HERO_RUN = "ds_hero", "run_hero"
-# Measured offline against the generator's hidden truth (seed 2, tiny world); see docs/EVAL.md.
-HERO_EVAL = {
-    "world": "synthetic hero world (seed 2)",
-    "observable_transactions": 87,
-    "origin_top1": 0.402,
-    "origin_top3": 0.517,
-    "origin_random_baseline": 0.045,
-    "wallet_clusters": 216,
-    "wallet_cluster_purity": 1.0,
-}
+EVAL_JSON = Path(__file__).parent / "demo" / "eval.json"
 
 
 def seed_hero(db: Database, settings: Settings) -> None:
@@ -141,4 +132,4 @@ def hero_leads_exist(db: Database) -> bool:
         return session.scalar(select(Run.id).where(Run.id == HERO_RUN)) is not None
 
 
-__all__ = ["HERO_EVAL", "audit", "seed_hero"]
+__all__ = ["EVAL_JSON", "audit", "seed_hero"]

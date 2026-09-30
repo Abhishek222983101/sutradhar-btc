@@ -10,7 +10,7 @@ from datetime import timedelta
 from pathlib import Path, PurePosixPath
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, Header, Request, UploadFile
+from fastapi import APIRouter, File, Form, Header, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -281,3 +281,38 @@ def get_dataset(
     )
     detail.files = [DatasetFileOut.model_validate(f) for f in files]
     return detail
+
+
+@router.get("/datasets/{dataset_id}/rejects")
+def dataset_rejects(
+    dataset_id: str,
+    request: Request,
+    principal: Annotated[Principal, require(Action.VIEW)],
+    db: ReadDB,
+    rule: Annotated[str | None, Query(max_length=8)] = None,
+    limit: Limit = 50,
+    cursor: Cursor = None,
+) -> Page[dict]:
+    """Rows the ingest refused, each with its rule id and reason (values are text, truncated to 200 characters)."""
+    import duckdb
+
+    _visible_dataset(db, dataset_id, principal)
+    path = request.app.state.settings.data_dir / "datasets" / dataset_id / "dataset.duckdb"
+    if not path.exists():
+        return Page[dict](items=[], next_cursor=None)
+    after = decode_cursor(cursor, (int,))
+    offset = after[0] if after else 0
+    con = duckdb.connect(str(path), read_only=True)
+    try:
+        where, params = ("WHERE rule = ?", [rule]) if rule else ("", [])
+        rows = con.execute(
+            f'SELECT file_id, row_no, rule, "field", value, message FROM rejects {where} ORDER BY file_id, row_no, rule LIMIT ? OFFSET ?',  # noqa: S608
+            [*params, limit + 1, offset],
+        ).fetchall()
+    finally:
+        con.close()
+    more, rows = len(rows) > limit, rows[:limit]
+    items = [
+        dict(zip(("file_id", "row_no", "rule", "field", "value", "message"), r, strict=True)) for r in rows
+    ]
+    return Page[dict](items=items, next_cursor=encode_cursor([offset + limit]) if more else None)

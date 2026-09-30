@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
-import { enterDemo, publicGet, type Info } from "./api";
+import { enterDemo, publicGet, type Eval, type Info } from "./api";
 import { LABEL, REQUIREMENTS } from "./requirements";
 import Threads from "./Threads";
+
+const pc = (v: number) => `${Math.round(v * 1000) / 10}%`;
 
 export default function Landing({ go }: { go: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState<Info | null>(null);
   const [up, setUp] = useState<boolean | null>(null);
+  const [ev, setEv] = useState<Eval | null>(null);
   useEffect(() => {
     publicGet<Info>("/api/v1/system/info").then((i) => { setInfo(i); setUp(true); }, () => setUp(false));
+    publicGet<Eval>("/api/v1/eval").then(setEv, () => undefined);
   }, []);
   const start = async () => {
     setBusy(true); setError("");
@@ -35,12 +39,13 @@ export default function Landing({ go }: { go: () => void }) {
           </div>
           <Threads />
         </section>
-        <section className="stats" aria-label="Results on the test world">
-          <div className="stat"><b>40%</b><span>origin IP found first try (chance: 4.5%)</span></div>
-          <div className="stat"><b>52%</b><span>origin IP in the top 3 candidates</span></div>
-          <div className="stat"><b>100%</b><span>wallet clusters pure against hidden truth</span></div>
+        <section className="stats" aria-label="Results on the test worlds">
+          <div className="stat"><b>{ev ? pc(ev.origin_top1_mean) : "…"}</b><span>origin IP found first try (random guess: {ev ? pc(ev.origin_random_baseline_mean) : "…"})</span></div>
+          <div className="stat"><b>{ev ? pc(ev.origin_top3_mean) : "…"}</b><span>origin IP in the top 3 candidates</span></div>
+          <div className="stat"><b>{ev ? pc(ev.wallet_cluster_purity_mean) : "…"}</b><span>wallet clusters pure against hidden truth</span></div>
           <div className="stat"><b>{live} of 20</b><span>requirements live, the rest shown honestly below</span></div>
         </section>
+        {ev && <p className="note">Measured on {ev.seeds.length} freshly generated worlds ({ev.observable_transactions_total} observable transactions) with hidden ground truth; reproduce with <span className="mono">sutradhar evals report</span>.</p>}
         <section id="board">
           <h2 className="section-title">Every requirement, and where to see it</h2>
           <p className="note">Status is what runs today. Nothing here is a mock-up.</p>

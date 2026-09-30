@@ -1,0 +1,73 @@
+"""Build docs/EVAL.json (and .md): the numbers the web app and README quote, computed fresh, never hand-typed."""
+
+from __future__ import annotations
+
+import json
+import statistics
+from pathlib import Path
+
+from sutradhar_evals.metrics import evaluate
+from sutradhar_gen.config import PRESETS
+
+DOCS = Path(__file__).resolve().parents[3] / "docs"
+SEEDS = (1, 2, 3, 4, 5)
+
+
+def main(scenario: str = "demo", out_dir: Path = DOCS, seeds: tuple[int, ...] = SEEDS) -> dict:
+    import tempfile
+
+    reports = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for seed in seeds:
+            reports.append(evaluate(PRESETS[scenario], seed, Path(tmp) / f"seed{seed}"))
+    top1 = [r.origin.top1_accuracy for r in reports]
+    top3 = [r.origin.top3_accuracy for r in reports]
+    baseline = [r.origin.random_baseline for r in reports]
+    purity = [r.cluster.purity for r in reports]
+    summary = {
+        "scenario": scenario,
+        "seeds": list(seeds),
+        "runs": [r.to_dict() for r in reports],
+        "origin_top1_mean": round(statistics.mean(top1), 4),
+        "origin_top1_stdev": round(statistics.pstdev(top1), 4) if len(top1) > 1 else 0.0,
+        "origin_top3_mean": round(statistics.mean(top3), 4),
+        "origin_random_baseline_mean": round(statistics.mean(baseline), 4),
+        "wallet_cluster_purity_mean": round(statistics.mean(purity), 4),
+        "observable_transactions_total": sum(r.origin.observable_transactions for r in reports),
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "EVAL.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    lines = [
+        "# Evaluation results",
+        "",
+        f"Computed by `uv run sutradhar evals report`, scenario `{scenario}`, seeds {list(seeds)}. Not hand-typed —",
+        "re-run the command to reproduce every number below against freshly generated worlds with hidden ground truth.",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| Origin IP found, first try (top-1) | **{summary['origin_top1_mean']:.1%}** (± {summary['origin_top1_stdev']:.1%} across seeds) |",
+        f"| Origin IP in top 3 candidates | **{summary['origin_top3_mean']:.1%}** |",
+        f"| Random-guess baseline (informational) | {summary['origin_random_baseline_mean']:.1%} |",
+        f"| Wallet cluster purity vs. hidden truth | **{summary['wallet_cluster_purity_mean']:.1%}** |",
+        f"| Observable transactions evaluated | {summary['observable_transactions_total']} |",
+        "",
+        "## Per-seed detail",
+        "",
+        "| Seed | Top-1 | Top-3 | Baseline | Clusters | Purity |",
+        "|---|---|---|---|---|---|",
+    ]
+    for r in reports:
+        lines.append(
+            f"| {r.seed} | {r.origin.top1_accuracy:.1%} | {r.origin.top3_accuracy:.1%} | {r.origin.random_baseline:.1%} "
+            f"| {r.cluster.clusters} | {r.cluster.purity:.1%} |"
+        )
+    lines.append("")
+    (out_dir / "EVAL.md").write_text("\n".join(lines), encoding="utf-8")
+    api_copy = DOCS.parent / "apps/api/sutradhar_api/demo/eval.json"
+    if api_copy.parent.exists():
+        api_copy.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return summary
+
+
+if __name__ == "__main__":
+    print(json.dumps(main(), indent=2))

@@ -44,7 +44,7 @@ def test_every_mutating_endpoint_declares_permission() -> None:
 
 @pytest.mark.security
 def test_every_data_endpoint_requires_sign_in() -> None:
-    public_reads = {"/api/health", "/api/ready", "/api/v1/system/info", "/api/docs"}
+    public_reads = {"/api/health", "/api/ready", "/api/v1/system/info", "/api/docs", "/api/v1/eval"}
     open_routes = [
         r.path
         for r in _routes()

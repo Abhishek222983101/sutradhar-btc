@@ -95,12 +95,43 @@ def ingest(
     ] = None,
     out: Annotated[Path, typer.Option(help="Datasets directory.")] = Path("data/datasets"),
     dataset_id: Annotated[str | None, typer.Option(help="Dataset id (default: new ds_ id).")] = None,
+    auto_map: Annotated[
+        bool, typer.Option(help="Guess the column mapping (CSV/TSV) instead of using a built-in profile.")
+    ] = False,
 ) -> None:
     """Ingest files into an immutable dataset store and print its X-ray."""
     from sutradhar_engine.ingest.builtin_profiles import BUILTIN_PROFILES, PROFILE_BY_EXTENSION
     from sutradhar_engine.ingest.pipeline import ingest as run_ingest
     from sutradhar_schemas.ids import new_id
 
+    if auto_map:
+        import csv
+
+        from sutradhar_engine.ingest.automap import propose_profile
+
+        with files[0].open(encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            samples: dict[str, list[str]] = {c: [] for c in reader.fieldnames or []}
+            for i, record in enumerate(reader):
+                if i >= 20:
+                    break
+                for col, value in record.items():
+                    samples[col].append(value or "")
+        guess = propose_profile(list(samples), samples)
+        for target, (col, conf) in guess.matched.items():
+            typer.echo(f"  {target:<18} <- {col} ({conf:.0%})")
+        for note in guess.notes:
+            typer.echo(f"  note: {note}")
+        if guess.profile is None:
+            raise typer.BadParameter(
+                "could not map the file: " + ", ".join(guess.missing_required) + " missing"
+            )
+        ds_id = _checked_id(dataset_id, "ds") if dataset_id else new_id("ds")
+        cap = run_ingest(files, guess.profile, out / ds_id, ds_id).capability
+        typer.echo(
+            f"{ds_id}: {cap.rows} observations, {cap.txs} transactions, rejects {cap.quality['rejects']}"
+        )
+        return
     profile = profile or PROFILE_BY_EXTENSION.get(files[0].suffix.lower(), "canonical-v1")
     if profile not in BUILTIN_PROFILES:
         raise typer.BadParameter(f"unknown profile {profile!r}; choose from {sorted(BUILTIN_PROFILES)}")
@@ -260,6 +291,37 @@ def users_create(
         )
         session.commit()
     typer.echo(f"created {user.id} ({role}); password (shown once): {password}")
+
+
+evals_app = typer.Typer(help="Evaluation against hidden ground truth.", no_args_is_help=True)
+app.add_typer(evals_app, name="evals")
+
+
+@evals_app.command("report")
+def evals_report(
+    scenario: Annotated[str, typer.Option(help="Scenario to evaluate.")] = "demo",
+    seeds: Annotated[str, typer.Option(help="Comma-separated seeds.")] = "1,2,3,4,5",
+    out: Annotated[Path, typer.Option(help="Where to write EVAL.json/EVAL.md.")] = Path("docs"),
+) -> None:
+    """Generate fresh worlds, run the engine, and score it against hidden ground truth. Writes docs/EVAL.json."""
+    from sutradhar_evals.report import main as run_report
+
+    seed_list = tuple(int(s) for s in seeds.split(","))
+    summary = run_report(scenario, out, seed_list)
+    typer.echo(
+        f"origin top-1 {summary['origin_top1_mean']:.1%} (baseline {summary['origin_random_baseline_mean']:.1%}), "
+        f"top-3 {summary['origin_top3_mean']:.1%}, cluster purity {summary['wallet_cluster_purity_mean']:.1%} "
+        f"-> {out / 'EVAL.json'}"
+    )
+
+
+@evals_app.command("train-origin")
+def evals_train_origin() -> None:
+    """Train the origin model on generated worlds (seeds 100-119) and write its JSON weights."""
+    from sutradhar_evals.train_origin import main as train
+
+    info = train()["trained_on"]
+    typer.echo(f"trained origin-lr@1 on {info['rows']} candidate rows ({info['positives']} true origins)")
 
 
 audit_app = typer.Typer(help="The audit chain.", no_args_is_help=True)

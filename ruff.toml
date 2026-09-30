@@ -4,7 +4,7 @@ extend-exclude = ["apps/web", "node_modules", "worlds", "data"]
 
 [lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "C4", "PT", "N", "PL", "PERF"]
-ignore = ["N818","PLR0912","PLR0917","PT012","PT018","S105","S106","RUF012","RUF002","RUF001","PLW0108","C416",
+ignore = ["PLR0915","PERF401","RUF043","N818","PLR0912","PLR0917","PT012","PT018","S105","S106","RUF012","RUF002","RUF001","PLW0108","C416",
   "E501",     # line length is handled by the formatter
   "PLR0913",  # engine stages legitimately take many parameters
   "PLR2004",  # magic values are allowed in tests and thresholds live in settings
@@ -13,6 +13,7 @@ ignore = ["N818","PLR0912","PLR0917","PT012","PT018","S105","S106","RUF012","RUF
 
 [lint.per-file-ignores]
 "**/tests/**" = ["S101", "S311", "S603", "S607", "PLR0915", "N802"]
+"scripts/**" = ["S311"]
 "tests/**" = ["S101", "S311", "S603", "S607", "PLR0915", "N802"]
 
 [lint.isort]

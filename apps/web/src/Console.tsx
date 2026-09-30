@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Evidence, type Lead } from "./api";
+import DataPanel from "./DataPanel";
 
 const TYPES = ["ALL", "ACTOR", "CHAIN", "TX"] as const;
 const NAMES: Record<string, string> = { ACTOR: "Wallet", CHAIN: "Peel chain", TX: "Unusual tx" };
@@ -14,17 +15,19 @@ export default function Console({ home }: { home: () => void }) {
   const [sel, setSel] = useState<Lead | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [datasetId, setDatasetId] = useState("ds_hero");
+  const [runId, setRunId] = useState("run_hero");
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
       const q = type === "ALL" ? "" : `&type=${type}`;
-      const page = await api<Page<Lead>>(`/api/v1/runs/run_hero/leads?limit=100${q}`);
+      const page = await api<Page<Lead>>(`/api/v1/runs/${runId}/leads?limit=100${q}`);
       setLeads(page.items);
       setSel((cur) => page.items.find((l) => l.id === cur?.id) ?? page.items[0] ?? null);
     } catch (e) { setError((e as Error).message); }
     setLoading(false);
-  }, [type]);
+  }, [type, runId]);
   useEffect(() => { void load(); }, [load]);
 
   return (
@@ -51,10 +54,11 @@ export default function Console({ home }: { home: () => void }) {
             </button>
           ))}
         </div>
-        <Upload onDone={load} />
+        <Upload onDone={(d, r) => { setDatasetId(d); setRunId(r); }} />
       </div>
       <div className="detail">
         {sel ? <Detail lead={sel} /> : <div className="panel empty">Select a lead.</div>}
+        <DataPanel datasetId={datasetId} />
         <p><a href="#/" onClick={home}>Back to the requirement board</a></p>
       </div>
     </div>
@@ -164,7 +168,7 @@ function Replay({ arrivals, target }: { arrivals: Evidence["transactions"][numbe
   );
 }
 
-function Upload({ onDone }: { onDone: () => void }) {
+function Upload({ onDone }: { onDone: (datasetId: string, runId: string) => void }) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const send = async (file: File) => {
@@ -180,16 +184,16 @@ function Upload({ onDone }: { onDone: () => void }) {
       const run = await api<{ job: { id: string }; run: { id: string } }>("/api/v1/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataset_id: res.dataset.id }) });
       const done = await poll(run.job.id);
       if (done.status !== "succeeded") throw new Error(done.error ?? "analysis failed");
-      setMsg(`Done: ${(done.result as { leads: number }).leads} leads. Open the run ${run.run.id.slice(0, 12)}… via the API. Your upload is deleted after 60 minutes.`);
-      onDone();
+      setMsg(`Done: ${(done.result as { leads: number }).leads} leads found in your upload. It is deleted after 60 minutes.`);
+      onDone(res.dataset.id, run.run.id);
     } catch (e) { setMsg((e as Error).message); }
     setBusy(false);
   };
   return (
     <div className="upload">
       <label className="drop">
-        <b>Try your own file</b><br /><span className="note">CSV in the canonical layout, up to 25 MB.</span>
-        <input type="file" accept=".csv,.tsv,.txt" disabled={busy} style={{ display: "block", margin: "8px auto 0" }}
+        <b>Try your own file</b><br /><span className="note">CSV, JSON, NDJSON or XML in the canonical layout, up to 25 MB.</span>
+        <input type="file" accept=".csv,.tsv,.txt,.json,.ndjson,.jsonl,.xml" disabled={busy} style={{ display: "block", margin: "8px auto 0" }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) void send(f); }} />
       </label>
       {msg && <div className="note" role="status">{msg}</div>}
