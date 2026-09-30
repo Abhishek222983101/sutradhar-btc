@@ -149,7 +149,7 @@ def _record(
             payload={
                 "dataset_id": dataset_id,
                 "files": [s.relative for s in saved],
-                "profile": "canonical-v1",
+                "profile": PROFILES[saved[0].format],
             },
             created_by=principal.user.id,
             idempotency_key=key,

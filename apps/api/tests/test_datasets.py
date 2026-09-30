@@ -182,3 +182,47 @@ def test_hostile_cursors_are_rejected(client: TestClient, analyst: dict[str, str
     response = client.get("/api/v1/datasets", headers=analyst, params={"cursor": cursor})
     assert response.status_code == 400
     assert client.get("/api/v1/datasets", headers=analyst, params={"limit": 501}).status_code == 422
+
+
+@pytest.mark.parametrize("fmt", ["json", "ndjson", "xml"])
+def test_every_supported_format_ingests_through_the_api(
+    client: TestClient, analyst: dict[str, str], tiny_csv: bytes, fmt: str
+) -> None:
+    """Regression: uploads must use the profile that matches their format, not always the CSV one."""
+    import csv
+    import io
+    import json
+    from xml.sax.saxutils import escape
+
+    from sutradhar_api.jobs.worker import Worker
+
+    arrays = ("input_addresses", "input_amounts", "output_addresses", "output_amounts")
+    rows = list(csv.DictReader(io.StringIO(tiny_csv.decode())))[:300]
+    recs = [{**r, **{k: json.loads(r[k]) for k in arrays}} for r in rows]
+    if fmt == "json":
+        body = json.dumps(recs)
+    elif fmt == "ndjson":
+        body = "\n".join(json.dumps(r) for r in recs)
+    else:
+
+        def one(r: dict) -> str:
+            parts = [
+                f"<{k}>" + "".join(f"<item>{escape(str(i))}</item>" for i in v) + f"</{k}>"
+                if isinstance(v, list)
+                else f"<{k}>{escape(str(v))}</{k}>"
+                for k, v in r.items()
+            ]
+            return "<record>" + "".join(parts) + "</record>"
+
+        body = "<records>" + "".join(one(r) for r in recs) + "</records>"
+    response = client.post(
+        "/api/v1/datasets",
+        headers=analyst,
+        files={"files": (f"t.{fmt}", body.encode(), "application/octet-stream")},
+    )
+    assert response.status_code == 202, response.text
+    assert Worker(client.app.state.settings, client.app.state.db).run_once()
+    job = client.get(f"/api/v1/jobs/{response.json()['job']['id']}", headers=analyst).json()
+    assert job["status"] == "succeeded", job
+    assert job["result"]["rows"] == len(recs)
+    assert job["result"]["rejects"] == 0
