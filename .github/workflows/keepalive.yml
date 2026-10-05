@@ -1,13 +1,34 @@
 name: keepalive
-# Free-tier hosts sleep after idle time. A ping every 10 minutes keeps the live demo warm.
+# The demo API runs on a free host that sleeps after 15 idle minutes. GitHub throttles plain cron triggers to every few
+# hours, so this workflow keeps itself running instead: one job pings the API every 4 minutes for 5 h 40 min, then starts
+# the next link of the chain (workflow_dispatch from GITHUB_TOKEN is allowed to trigger a run). The 30-minute cron only
+# restarts the chain if it ever breaks; the concurrency group keeps exactly one running and at most one waiting.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
-permissions: {}
+permissions:
+  actions: write
+  contents: read
+concurrency:
+  group: keepalive-chain
+  cancel-in-progress: false
 jobs:
   ping:
+    if: ${{ vars.DEMO_API_URL != '' }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    env:
+      URL: ${{ vars.DEMO_API_URL }}
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - run: curl -fsS --max-time 60 --retry 3 --retry-delay 10 "${{ vars.DEMO_API_URL }}/api/health"
-        if: ${{ vars.DEMO_API_URL != '' }}
+      - name: Ping every 4 minutes for about 5 h 40 min
+        run: |
+          end=$(( $(date +%s) + 20400 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            curl -fsS --max-time 90 --retry 2 --retry-delay 10 "$URL/api/health" >/dev/null && echo "$(date -u +%H:%M:%S) ok" || echo "$(date -u +%H:%M:%S) ping failed"
+            sleep 240
+          done
+      - name: Start the next link of the chain
+        if: always()
+        run: gh workflow run keepalive.yml --repo "$GITHUB_REPOSITORY"
