@@ -52,7 +52,7 @@ export default function Guide() {
         lede="Follow the numbered steps. Each one says where to click, what to paste, what you should see, and which line of the problem statement it proves. A small tour card follows you through the site and moves you on when you press Next."
       />
       <Callout tone="info" title="Before you start">
-        All data is synthetic and the hero dataset is the same on every install. If the status pill in the header says the server is waking, wait: the free host needs 30–45 seconds after a quiet spell, and every page continues automatically.
+        All data is synthetic and the hero dataset is the same on every install. If the header says the server is waking, keep going: a labelled saved copy of the demo data shows meanwhile and switches to live on its own in 30–45 seconds. Only Upload, Cases and Verify need the live server.
       </Callout>
       <div className="two-col" style={{ gridTemplateColumns: "1fr auto", alignItems: "center" }}>
         <div>

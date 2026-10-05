@@ -58,7 +58,7 @@ export default function Landing({ go: toConsole }: { go: () => void }) {
                 </>
               )}
             </div>
-            <p className="note" style={{ marginTop: 12 }}>No sign-up. Synthetic data only. After a quiet spell the free server needs up to 45 seconds to wake; the header says when.</p>
+            <p className="note" style={{ marginTop: 12 }}>No sign-up. Synthetic data only. If the free server has been idle it wakes in up to 45 seconds; a saved copy of the demo data shows meanwhile and the header says so.</p>
             {error && <p className="err" role="alert">{error}</p>}
           </div>
           <Threads />
