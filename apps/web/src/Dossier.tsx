@@ -13,46 +13,82 @@ export default function Dossier({
   kind,
   ref: reference,
   close,
+  embedded = false,
+  onOpen,
 }: {
   runId: string;
   kind: string;
   ref: string;
-  close: () => void;
+  close?: () => void;
+  embedded?: boolean;
+  onOpen?: (kind: string, ref: string) => void;
 }) {
-  const [data, setData] = useState<Row | null>(null);
+  const [loaded, setLoaded] = useState<{ k: string; d: Row } | null>(null);
+  const data = loaded && loaded.k === `${kind}:${reference}` ? loaded.d : null;
   const [error, setError] = useState("");
   useEffect(() => {
-    setData(null);
     setError("");
     const path =
       kind === "actor" ? `actors/${reference}`
       : kind === "address" ? `addresses/${reference}`
       : kind === "tx" ? `tx/${reference}`
+      : kind === "asn" ? `asn/${reference}`
       : `ips/${reference}`;
     void api<Row>(`/api/v1/runs/${runId}/${path}`)
-      .then(setData)
+      .then((d) => setLoaded({ k: `${kind}:${reference}`, d }))
       .catch((e) => setError((e as Error).message));
   }, [runId, kind, reference]);
 
+  const content = (
+    <>
+      {error && <div className="err">{error}</div>}
+      {!data && !error && <div className="note">Loading…</div>}
+      {data && kind === "actor" && <ActorView d={data} />}
+      {data && kind === "address" && <AddressView d={data} />}
+      {data && kind === "tx" && <TxView d={data} />}
+      {data && kind === "ip" && <IpView d={data} />}
+      {data && kind === "asn" && <AsnView d={data} onOpen={onOpen} />}
+    </>
+  );
+  if (embedded) return <div style={{ display: "grid", gap: 12 }}>{content}</div>;
   return (
     <div className="panel">
-      <h2>
-        {kind[0].toUpperCase() + kind.slice(1)} dossier
-        <button className="chip" onClick={close} style={{ float: "right" }}>
-          Close
-        </button>
+      <h2 style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {DOSSIER_TITLE[kind] ?? kind} dossier
+        {close && <button className="chip" onClick={close}>Close</button>}
       </h2>
-      <div className="body">
-        {error && <div className="err">{error}</div>}
-        {!data && !error && <div className="note">Loading…</div>}
-        {data && kind === "actor" && <ActorView d={data} />}
-        {data && kind === "address" && <AddressView d={data} />}
-        {data && kind === "tx" && <TxView d={data} />}
-        {data && kind === "ip" && <IpView d={data} />}
-      </div>
+      <div className="body">{content}</div>
     </div>
   );
 }
+
+function AsnView({ d, onOpen }: { d: Row; onOpen?: (kind: string, ref: string) => void }) {
+  const ips = d.ips as Row[];
+  return (
+    <>
+      <p>
+        <b>AS{d.asn as number}</b> {d.org ? `· ${d.org as string}` : ""} · {ips.length} IP address(es) in this dataset
+      </p>
+      <p className="small-note">Source: {d.source as string}, as of {d.as_of as string}. Open an IP to see which wallet groups it is linked to.</p>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead><tr><th>IP</th><th>Country</th><th>Transactions announced</th></tr></thead>
+          <tbody>
+            {ips.map((r) => (
+              <tr key={r.ip as string}>
+                <td className="num">{onOpen ? <button className="chip" onClick={() => onOpen("ip", r.ip as string)}>{r.ip as string}</button> : (r.ip as string)}</td>
+                <td>{(r.country as string) ?? "—"}</td>
+                <td className="num">{r.n_tx as number}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+const DOSSIER_TITLE: Record<string, string> = { ip: "IP", asn: "AS number", tx: "Transaction", actor: "Wallet group", address: "Address" };
 
 function LeadList({ leads }: { leads: Row[] }) {
   if (!leads.length) return null;

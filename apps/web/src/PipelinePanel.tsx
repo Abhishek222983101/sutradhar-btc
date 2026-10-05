@@ -6,8 +6,10 @@ const NAMES: Record<string, string> = {
   E01: "Load", E02: "GeoIP enrichment", E03: "Value flows", E04: "CoinJoin detection", E05: "Wallet clustering",
   E06: "Change-address model", E07: "Peel chains", E08: "Anomaly model", E09: "Origin IP model", E11: "Co-origin linking",
   E12: "Graph embeddings", E13: "Risk propagation", E14: "Behaviour fingerprints", E15: "Motifs", E16: "Merge suggestions",
-  E17: "Lead ranking", E19: "Publish",
+  E17: "Lead ranking", E18: "Explanations", E19: "Publish", E20: "Services and victims", E21: "Risk paths", E22: "Actor features",
 };
+const ROW_LABEL: Record<string, string> = { d_addr: "addresses", d_ip: "IPs", d_tx: "transactions", d_cluster: "wallet groups" };
+const label = (k: string) => ROW_LABEL[k] ?? k.replace(/^d_/, "").replace(/_/g, " ");
 const short = (c: string) => `${c.slice(0, 10)}…`;
 
 // What the engine did for this run (every stage, its output and time), and which wallets it thinks belong together.
@@ -55,7 +57,7 @@ export default function PipelinePanel({ runId }: { runId: string }) {
           <p className="note mono">result digest {run.result_digest?.slice(0, 16)}…, identical for identical input</p>
           <ul className="reasons">
             {stages.map(([code, st]) => (
-              <li key={code}>{NAMES[code] ?? code}: {Object.entries(st.rows).map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`).join(", ") || "done"}
+              <li key={code}>{NAMES[code] ?? code}: {Object.entries(st.rows).map(([k, v]) => `${v} ${label(k)}`).join(", ") || "done"}
                 <small className="mono">{code} · {st.ms} ms{st.notes.length ? ` · ${st.notes.join("; ")}` : ""}</small></li>
             ))}
           </ul>

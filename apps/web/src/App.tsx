@@ -1,82 +1,52 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import Academy from "./Academy";
-import { enterDemo, hasSession, publicGet, type Info } from "./api";
 import Cases from "./Cases";
 import Console from "./Console";
 import Govern from "./Govern";
+import Guide from "./Guide";
 import { t, useLang } from "./i18n";
 import Landing from "./Landing";
+import { go, useRoute } from "./router";
+import { ErrorBoundary } from "./ui";
 import ScenarioStudio from "./ScenarioStudio";
+import { GuideDock, Header, WakeBanner } from "./Shell";
+import System from "./System";
+import Verify from "./Verify";
+import { probe } from "./wake";
 
-type Page = "home" | "console" | "cases" | "govern" | "academy" | "scenarios";
-const route = (): Page => {
-  const h = location.hash;
-  if (h.startsWith("#/cases")) return "cases";
-  if (h.startsWith("#/govern")) return "govern";
-  if (h.startsWith("#/academy")) return "academy";
-  if (h.startsWith("#/scenarios")) return "scenarios";
-  if (h.startsWith("#/console")) return "console";
-  return "home";
-};
+const HowItWorks = lazy(() => import("./HowItWorks"));
 
 export default function App() {
-  const [page, setPage] = useState(route());
+  const route = useRoute();
   const [lang, setLang] = useLang();
-  useEffect(() => {
-    const on = () => setPage(route());
-    window.addEventListener("hashchange", on);
-    return () => window.removeEventListener("hashchange", on);
-  }, []);
-  useEffect(() => {
-    if (page === "home" || hasSession()) return;
-    publicGet<Info>("/api/v1/system/info")
-      .then((i) => {
-        if (i.mode === "demo") return enterDemo();
-        location.hash = "#/";
-      })
-      .catch(() => undefined);
-  }, [page]);
-  const go = () => {
-    location.hash = "#/console";
-  };
+  useEffect(() => { void probe().catch(() => undefined); }, []);
+  useEffect(() => { window.scrollTo({ top: 0 }); document.title = `${t(lang, TITLES[route.page])} · Sutradhar`; }, [route.page, lang]);
+
   return (
     <>
-      <header className="top">
-        <div className="wrap">
-          <a className="brand" href="#/">
-            <b>S</b>Sutradhar
-          </a>
-          <span className="tag ok">{t(lang, "Runs offline")}</span>
-          <span className="tag warn">{t(lang, "Synthetic data")}</span>
-          <nav className="nav">
-            <a href="#/">{t(lang, "Requirements")}</a>
-            <a href="#/console">{t(lang, "Console")}</a>
-            <a href="#/cases">{t(lang, "Cases")}</a>
-            <a href="#/govern">{t(lang, "Govern")}</a>
-            <a href="#/academy">{t(lang, "Academy")}</a>
-            <a href="#/scenarios">{t(lang, "Scenario Studio")}</a>
-            <a className="btn" href="#/console">
-              {t(lang, "Open demo")}
-            </a>
-            <button
-              className="lang-toggle"
-              aria-pressed={lang === "hi"}
-              title="हिन्दी में चरण-सूची — machine-translated chrome text, not yet native-reviewed"
-              onClick={() => setLang(lang === "en" ? "hi" : "en")}
-            >
-              {lang === "en" ? "हिं" : "EN"}
-            </button>
-          </nav>
-        </div>
-      </header>
-      <main>
-        {page === "console" && <Console home={() => (location.hash = "#/")} lang={lang} />}
-        {page === "cases" && <Cases runId="run_hero" lang={lang} />}
-        {page === "govern" && <Govern lang={lang} />}
-        {page === "academy" && <Academy lang={lang} />}
-        {page === "scenarios" && <ScenarioStudio lang={lang} />}
-        {page === "home" && <Landing go={go} />}
+      <a className="skip" href="#main">Skip to content</a>
+      <Header lang={lang} setLang={setLang} />
+      <WakeBanner />
+      <main id="main">
+        <ErrorBoundary key={route.page}>
+        {route.page === "home" && <Landing go={() => go("console")} />}
+        {route.page === "guide" && <Guide />}
+        {route.page === "console" && <Console route={route} lang={lang} />}
+        {route.page === "cases" && <Cases runId="run_hero" lang={lang} />}
+        {route.page === "verify" && <Verify />}
+        {route.page === "govern" && <Govern lang={lang} />}
+        {route.page === "system" && <System />}
+        {route.page === "how" && <Suspense fallback={<div className="wrap empty">Loading…</div>}><HowItWorks /></Suspense>}
+        {route.page === "academy" && <Academy lang={lang} />}
+        {route.page === "scenarios" && <ScenarioStudio lang={lang} />}
+        </ErrorBoundary>
       </main>
+      <GuideDock />
     </>
   );
 }
+
+const TITLES = {
+  home: "Requirements", guide: "Judge guide", console: "Console", cases: "Cases", verify: "Verify", govern: "Govern",
+  system: "System", how: "How it works", academy: "Academy", scenarios: "Scenario Studio",
+} as const;

@@ -34,6 +34,11 @@ const DICT: Record<string, string> = {
   Submit: "जमा करें",
   Questions: "प्रश्न",
   "Scenario Studio": "परिदृश्य स्टूडियो",
+  Verify: "सत्यापन",
+  System: "सिस्टम",
+  "How it works": "यह कैसे काम करता है",
+  "Judge guide": "निर्णायक गाइड",
+  More: "और",
   Result: "परिणाम",
 };
 
