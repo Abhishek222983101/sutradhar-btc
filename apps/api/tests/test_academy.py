@@ -14,7 +14,12 @@ def test_challenge_hides_answers(client: TestClient) -> None:
     challenge = client.get("/api/v1/academy/challenges", headers=headers).json()[0]
     assert set(challenge) == {"id", "title", "time_limit_s", "questions"}
     for q in challenge["questions"]:
-        assert set(q) == {"id", "text", "options", "kind"}  # no "correct" or "answer" field ever leaves the server
+        assert set(q) == {
+            "id",
+            "text",
+            "options",
+            "kind",
+        }  # no "correct" or "answer" field ever leaves the server
 
 
 def test_attempt_is_scored(client: TestClient) -> None:

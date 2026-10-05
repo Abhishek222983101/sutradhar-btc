@@ -33,8 +33,12 @@ def bench(scenario: str, seed: int) -> dict:
         manifest = run_pipeline(root / "ds", root / "run", "run_bench")
         t_run = time.perf_counter() - t0
         return {
-            "scenario": scenario, "rows": summary["counts"]["observations"], "txs": result.capability.txs,
-            "generate_s": round(t_gen, 2), "ingest_s": round(t_ingest, 2), "run_s": round(t_run, 2),
+            "scenario": scenario,
+            "rows": summary["counts"]["observations"],
+            "txs": result.capability.txs,
+            "generate_s": round(t_gen, 2),
+            "ingest_s": round(t_ingest, 2),
+            "run_s": round(t_run, 2),
             "stage_ms": {k: v.ms for k, v in manifest.stages.items()},
         }
 
@@ -43,4 +47,6 @@ if __name__ == "__main__":
     results = [bench(s, 1) for s in ("tiny", "demo", "rich")]
     print(json.dumps(results, indent=2))
     for r in results:
-        print(f"{r['scenario']:6s}: {r['txs']:5d} tx, {r['rows']:6d} obs -> generate {r['generate_s']}s, ingest {r['ingest_s']}s, run {r['run_s']}s")
+        print(
+            f"{r['scenario']:6s}: {r['txs']:5d} tx, {r['rows']:6d} obs -> generate {r['generate_s']}s, ingest {r['ingest_s']}s, run {r['run_s']}s"
+        )

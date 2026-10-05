@@ -33,10 +33,10 @@ Legend: ✅ done · 🟡 done with a known gap
 | P2.7 Reference data | ✅ | manifest, checksums, refresh script, API; added `anon-ranges.txt` (Tor-exit/public-VPN CIDR matching, tagged in `ip_geo.note`) + `scripts/fetch_anon_ranges.py` — ships empty (I1: the product never fetches at runtime), a maintainer refreshes it online, same pattern as DB-IP |
 | P2.8 Ingest API and UI | ✅ | multi-format upload, progress, X-ray, rejects |
 | P3.1 Value flows | ✅ | cluster-to-cluster flow graph |
-| P3.2 CoinJoin | 🟡 | scored rule, not a trained classifier; tested on our clean mixes |
+| P3.2 CoinJoin | ✅ | trained logistic classifier `coinjoin-lr@1` (12 structural features, 60 domain-randomised training worlds, validated by world); matches the scored heuristic it replaced (100% / 100%) rather than beating it, since the generator has no equal-valued benign look-alikes; heuristic kept as baseline and no-weights fallback |
 | P3.3 Clustering | ✅ | common-input ownership with CoinJoin guard and change links |
-| P3.4 Change model | ✅ | trained logistic model, 94% per transaction |
-| P3.5 Peel chains | ✅ | timing-aware; 81.6% precision, 100% recall |
+| P3.4 Change model | ✅ | trained logistic model, 95.2% per transaction |
+| P3.5 Peel chains | ✅ | timing-aware; hop precision 37.1%, recall 100%; published CHAIN leads 100% real chains |
 | P3.6 Motifs, plugin SDK | ✅ | consolidation and fan-out motifs; entry-point plugin stages with docs and tests |
 | P3.7 Embeddings | ✅ | 16-dimension SVD of the flow graph |
 | P3.8 Training pipeline | ✅ | `sutradhar evals train-origin` and `train-change`, JSON weights |
@@ -78,7 +78,7 @@ change-address identification 95.2%; published CHAIN leads are 100% real peeling
 | Render (free tier) for the demo API instead of Railway | The Railway free plan could not provision a service |
 | One web app for landing, console and metrics | One link for judges, identical offline |
 | Address plausibility (V12) rejects the row instead of warning | Keeps markup-shaped text out of the store, UI and exports |
-| Peel chains require one input and a one-hour hop gap | Without timing the rule flagged ordinary users (7% precision) |
+| Peel chains require one input and a one-hour hop gap | Without timing the rule flagged ordinary users (7% hop precision) |
 | Change links used for clustering need p ≥ 0.99 | Looser thresholds added links but lowered cluster purity |
 
 
