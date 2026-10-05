@@ -12,6 +12,7 @@ import ScenarioStudio from "./ScenarioStudio";
 import { GuideDock, Header, WakeBanner } from "./Shell";
 import System from "./System";
 import Verify from "./Verify";
+import { useProgress } from "./progress";
 import { probe } from "./wake";
 
 const HowItWorks = lazy(() => import("./HowItWorks"));
@@ -19,6 +20,8 @@ const HowItWorks = lazy(() => import("./HowItWorks"));
 export default function App() {
   const route = useRoute();
   const [lang, setLang] = useLang();
+  const progress = useProgress();
+  const dockOpen = route.page !== "guide" && route.page !== "home" && !progress.hidden && !progress.collapsed;
   useEffect(() => { void probe().catch(() => undefined); }, []);
   useEffect(() => { window.scrollTo({ top: 0 }); document.title = `${t(lang, TITLES[route.page])} · Sutradhar`; }, [route.page, lang]);
 
@@ -27,7 +30,7 @@ export default function App() {
       <a className="skip" href="#main">Skip to content</a>
       <Header lang={lang} setLang={setLang} />
       <WakeBanner />
-      <main id="main">
+      <main id="main" className={dockOpen ? "dock-pad" : undefined}>
         <ErrorBoundary key={route.page}>
         {route.page === "home" && <Landing go={() => go("console")} />}
         {route.page === "guide" && <Guide />}

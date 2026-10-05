@@ -370,3 +370,8 @@ body { overflow-x: clip; }
   .tl .r { grid-template-columns: 78px 1fr; }
   .tl .r span:last-child { grid-column: 1 / -1; }
 }
+
+/* While the tour card is open, leave room under the page so nothing can end up hidden behind it */
+.dock-pad { padding-bottom: 46vh; }
+.dock-body { max-height: 40vh; }
+@media (max-width: 640px) { .dock-pad { padding-bottom: 60vh; } }

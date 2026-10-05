@@ -5,7 +5,7 @@ import { readdirSync } from "node:fs";
 // tampering). Usage:  npm i playwright-core && BASE=https://sutradhar-one-red.vercel.app CHROME=/path/to/chrome node scripts/e2e-judge-flow.mjs
 const BASE = process.env.BASE ?? "http://localhost:4173";
 const exe = process.env.CHROME ?? "/usr/bin/google-chrome-stable";
-const browser = await chromium.launch({ executablePath: exe, args: ["--no-sandbox", "--disable-web-security"] });
+const browser = await chromium.launch({ executablePath: exe, args: BASE.startsWith("https") ? ["--no-sandbox"] : ["--no-sandbox", "--disable-web-security"] });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
 const page = await ctx.newPage();
 const errors = [];
@@ -110,7 +110,10 @@ await check("cases: create, note, exports with working download", async () => {
   await page.getByLabel("Add a note for the case file").fill("Taint path checked: 3 hops from the seed wallet.");
   await page.getByRole("button", { name: "Add note" }).click();
   await page.getByText("Taint path checked").waitFor(T);
-  for (const n of [0, 1, 2, 3]) await page.getByRole("button", { name: "Export", exact: true }).nth(n).click();
+  for (const label of ["Evidence pack", "GraphML", "MISP event", "i2 CSV"]) {
+    await page.locator(".req", { hasText: label }).getByRole("button").click();
+    await page.getByText(new RegExp(`${label.replace(/[()]/g, "")}.*: ready`)).first().waitFor(T);
+  }
   await page.getByText(/sha256 /).first().waitFor(T);
   const [dl] = await Promise.all([page.waitForEvent("download", T), page.getByRole("button", { name: "download" }).first().click()]);
   if (!/\.(zip|graphml|json|csv)$/.test(dl.suggestedFilename())) throw new Error(`download ${dl.suggestedFilename()}`);
