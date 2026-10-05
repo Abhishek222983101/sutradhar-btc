@@ -135,20 +135,34 @@ class CoinJoinMetrics:
     flagged: int
     precision: float
     recall: float
+    baseline_flagged: int = 0
+    baseline_precision: float = 1.0
+    baseline_recall: float = 1.0
 
 
 def coinjoin_detection(world: WorldRun, min_p: float = 0.5) -> CoinJoinMetrics:
+    """The trained classifier's precision/recall on one world, next to the scored heuristic it replaced."""
+    from sutradhar_engine.coinjoin_model import RULE_SQL
+
     truth = pl.read_parquet(world.world_dir / "truth" / "txs.parquet").filter(pl.col("exported"))
     actual = set(truth.filter(pl.col("kind") == "coinjoin")["txid"].to_list())
     con = duckdb.connect(str(world.run_dir / "run.duckdb"), read_only=True)
     flagged = {r[0] for r in con.execute("SELECT txid FROM coinjoin WHERE p >= ?", [min_p]).fetchall()}
     con.close()
-    tp = len(actual & flagged)
+    base = duckdb.connect()
+    base.execute(f"ATTACH '{(world.dataset_dir / 'dataset.duckdb').as_posix()}' AS ds (READ_ONLY)")
+    base.execute(RULE_SQL)
+    rule_flagged = {r[0] for r in base.execute("SELECT txid FROM coinjoin WHERE p >= ?", [min_p]).fetchall()}
+    base.close()
+
+    def prf(hit: set[str]) -> tuple[float, float]:
+        tp = len(actual & hit)
+        return (round(tp / len(hit), 4) if hit else 1.0, round(tp / len(actual), 4) if actual else 1.0)
+
+    precision, recall = prf(flagged)
+    base_precision, base_recall = prf(rule_flagged)
     return CoinJoinMetrics(
-        len(actual),
-        len(flagged),
-        round(tp / len(flagged), 4) if flagged else 1.0,
-        round(tp / len(actual), 4) if actual else 1.0,
+        len(actual), len(flagged), precision, recall, len(rule_flagged), base_precision, base_recall
     )
 
 

@@ -2,6 +2,8 @@
   "change_argmax_accuracy_mean": 0.952,
   "change_merge_links_total": 1317,
   "change_merge_precision_mean": 0.9955,
+  "coinjoin_baseline_precision_mean": 1.0,
+  "coinjoin_baseline_recall_mean": 1.0,
   "coinjoin_precision_mean": 1.0,
   "coinjoin_recall_mean": 1.0,
   "coinjoins_evaluated": 30,
@@ -45,6 +47,9 @@
         "purity": 1.0
       },
       "coinjoin": {
+        "baseline_flagged": 6,
+        "baseline_precision": 1.0,
+        "baseline_recall": 1.0,
         "flagged": 6,
         "precision": 1.0,
         "recall": 1.0,
@@ -111,6 +116,9 @@
         "purity": 0.9967
       },
       "coinjoin": {
+        "baseline_flagged": 6,
+        "baseline_precision": 1.0,
+        "baseline_recall": 1.0,
         "flagged": 6,
         "precision": 1.0,
         "recall": 1.0,
@@ -159,7 +167,7 @@
       "seed": 2,
       "suggest": {
         "precision_top50": 0.36,
-        "random_pair_rate": 0.0069,
+        "random_pair_rate": 0.006895,
         "suggestions": 200
       }
     },
@@ -177,6 +185,9 @@
         "purity": 0.9989
       },
       "coinjoin": {
+        "baseline_flagged": 6,
+        "baseline_precision": 1.0,
+        "baseline_recall": 1.0,
         "flagged": 6,
         "precision": 1.0,
         "recall": 1.0,
@@ -243,6 +254,9 @@
         "purity": 0.9989
       },
       "coinjoin": {
+        "baseline_flagged": 6,
+        "baseline_precision": 1.0,
+        "baseline_recall": 1.0,
         "flagged": 6,
         "precision": 1.0,
         "recall": 1.0,
@@ -291,7 +305,7 @@
       "seed": 4,
       "suggest": {
         "precision_top50": 0.22,
-        "random_pair_rate": 0.006876,
+        "random_pair_rate": 0.006868,
         "suggestions": 200
       }
     },
@@ -309,6 +323,9 @@
         "purity": 0.9989
       },
       "coinjoin": {
+        "baseline_flagged": 6,
+        "baseline_precision": 1.0,
+        "baseline_recall": 1.0,
         "flagged": 6,
         "precision": 1.0,
         "recall": 1.0,
@@ -371,6 +388,6 @@
     5
   ],
   "suggest_precision_mean": 0.34,
-  "suggest_random_rate_mean": 0.006911,
+  "suggest_random_rate_mean": 0.006908,
   "wallet_cluster_purity_mean": 0.9987
 }

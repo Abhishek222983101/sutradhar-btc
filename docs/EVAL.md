@@ -12,7 +12,8 @@ re-run the command to reproduce every number below against freshly generated wor
 | Baseline: random guess among announcers | 4.4% |
 | Wallet cluster purity vs. hidden truth | **99.9%** |
 | Observable transactions evaluated | 2038 |
-| CoinJoin detection precision / recall | **100.0%** / **100.0%** (30 CoinJoins) |
+| CoinJoin classifier (trained) precision / recall | **100.0%** / **100.0%** (30 CoinJoins) |
+| Baseline: the scored heuristic it replaced, precision / recall | 100.0% / 100.0% |
 | Cluster purity if CoinJoins were merged (ablation) | 99.5% |
 | Peel-chain hops: precision / recall | 37.1% / 100.0% (published CHAIN leads that are real chains: 100.0%) |
 | Merge suggestions (top 50): same operator | 34.0% (random pairs: 0.69%) |

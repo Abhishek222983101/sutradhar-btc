@@ -401,6 +401,18 @@ def evals_train_change() -> None:
     typer.echo(f"trained change-lr@1 on {info['rows']} outputs ({info['positives']} change outputs)")
 
 
+@evals_app.command("train-coinjoin")
+def evals_train_coinjoin() -> None:
+    """Train the CoinJoin classifier on domain-randomised worlds (seeds 400-459) and write its JSON weights."""
+    from sutradhar_evals.train_coinjoin import main as train
+
+    info = train()["trained_on"]
+    typer.echo(
+        f"trained coinjoin-lr@1 on {info['rows']} candidate txs ({info['positives']} mixes); "
+        f"held-out F1 {info['validation_f1']} vs rule baseline {info['baseline_rule_f1']}"
+    )
+
+
 @app.command()
 def selftest() -> None:
     """Check the whole system end to end with no network: generate, ingest, analyse, verify. Exit 1 on failure."""

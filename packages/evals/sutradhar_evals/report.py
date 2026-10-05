@@ -60,6 +60,12 @@ def main(scenario: str = "rich", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
         "coinjoin_precision_mean": round(statistics.mean(c.precision for c in cj), 4) if cj else None,
         "coinjoin_recall_mean": round(statistics.mean(c.recall for c in cj), 4) if cj else None,
         "coinjoins_evaluated": sum(c.truth_coinjoins for c in cj),
+        "coinjoin_baseline_precision_mean": round(statistics.mean(c.baseline_precision for c in cj), 4)
+        if cj
+        else None,
+        "coinjoin_baseline_recall_mean": round(statistics.mean(c.baseline_recall for c in cj), 4)
+        if cj
+        else None,
         "change_argmax_accuracy_mean": round(statistics.mean(r.change.argmax_accuracy for r in reports), 4),
         "change_merge_precision_mean": round(statistics.mean(r.change.merge_precision for r in reports), 4),
         "change_merge_links_total": sum(r.change.merge_links for r in reports),
@@ -87,7 +93,8 @@ def main(scenario: str = "rich", out_dir: Path = DOCS, seeds: tuple[int, ...] = 
     ]
     if summary["coinjoins_evaluated"]:
         lines += [
-            f"| CoinJoin detection precision / recall | **{summary['coinjoin_precision_mean']:.1%}** / **{summary['coinjoin_recall_mean']:.1%}** ({summary['coinjoins_evaluated']} CoinJoins) |",
+            f"| CoinJoin classifier (trained) precision / recall | **{summary['coinjoin_precision_mean']:.1%}** / **{summary['coinjoin_recall_mean']:.1%}** ({summary['coinjoins_evaluated']} CoinJoins) |",
+            f"| Baseline: the scored heuristic it replaced, precision / recall | {summary['coinjoin_baseline_precision_mean']:.1%} / {summary['coinjoin_baseline_recall_mean']:.1%} |",
             f"| Cluster purity if CoinJoins were merged (ablation) | {summary['purity_if_coinjoins_merged_mean']:.1%} |",
         ]
     lines += [

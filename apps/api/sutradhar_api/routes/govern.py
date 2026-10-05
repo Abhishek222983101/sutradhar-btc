@@ -211,6 +211,7 @@ def list_models(principal: Annotated[Principal, require(Action.VIEW)]) -> list[M
         ("lead_ranker", "lead_ranker.meta.json"),
         ("origin", "origin_lr.json"),
         ("change", "change_lr.json"),
+        ("coinjoin", "coinjoin_lr.json"),
     ):
         path = MODELS_DIR / filename
         if not path.exists():
