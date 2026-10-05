@@ -14,6 +14,7 @@ page.on("console", (m) => { if (m.type() === "error") errors.push(`console: ${m.
 
 const results = [];
 async function check(name, fn) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return;
   const t0 = Date.now();
   try { await fn(); results.push(["PASS", name, Date.now() - t0]); }
   catch (e) { results.push(["FAIL", name, `${e.message.split("\n")[0].slice(0, 220)}`]); await page.screenshot({ path: `fail_${results.length}.png` }).catch(() => {}); }
@@ -98,7 +99,10 @@ await check("filter: peel chain", async () => {
 await check("upload: sample CSV is ingested, analysed and shown", async () => {
   await go("/console"); await page.locator(".lead").first().waitFor(T);
   await page.locator('input[type="file"]').setInputFiles(new URL("../public/samples/sutradhar-sample.csv", import.meta.url).pathname);
-  await page.getByText(/Done: \d+ leads found/).waitFor({ timeout: 420_000 });
+  await page.getByText(/Done: \d+ leads found/).waitFor({ timeout: 420_000 }).catch(async (e) => {
+    const status = await page.locator("#section-upload [role=status]").innerText().catch(() => "(no status line)");
+    throw new Error(`${e.message.split("\n")[0]} | status line: ${status}`);
+  });
   await page.locator(".lead").first().waitFor(T);
 });
 

@@ -33,8 +33,8 @@ export default function Upload({ onDone }: { onDone: (datasetId: string, runId: 
       setMsg(`Loaded ${r.rows} rows, ${r.transactions} transactions, ${r.rejects} rejected, observation model: ${r.observation_model}. Running the analysis (the free demo server is small: usually 1 to 2 minutes)…`);
       const run = await api<{ job: { id: string }; run: { id: string } }>("/api/v1/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataset_id: res.dataset.id }) });
       const done = await poll(run.job.id, (j, sec) => {
-        const stage = j.stage ? `${j.stage} ${STAGE_NAMES[j.stage] ?? ""}`.trim() : "starting";
-        setMsg(`Running the analysis on the free demo server: ${sec}s so far (usually 1 to 2 minutes). Stage: ${stage}.`);
+        const stage = j.stage ? ` Stage: ${j.stage} ${STAGE_NAMES[j.stage] ?? ""}`.trimEnd() + "." : "";
+        setMsg(`Running the analysis on the free demo server: ${sec}s so far (usually 1 to 2 minutes).${stage}`);
       });
       if (done.status !== "succeeded") throw new Error(done.error ?? "analysis failed");
       setMsg(`Done: ${(done.result as { leads: number }).leads} leads found in your upload. The console now shows it. It is deleted after 60 minutes.`);
