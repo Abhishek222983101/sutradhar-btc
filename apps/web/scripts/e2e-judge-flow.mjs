@@ -164,6 +164,23 @@ await check("tour dock: Next moves to the next step's page", async () => {
   await page.getByRole("button", { name: /Done, next step/ }).click();
   await page.waitForURL(/tab=why/, T);
 });
+await check("session: an expired token is renewed once, without becoming a new visitor", async () => {
+  await go("/console"); await page.locator(".lead").first().waitFor(T);
+  const seen = { demo: 0, refresh: 0 };
+  page.on("request", (r) => { if (r.url().endsWith("/auth/demo")) seen.demo++; if (r.url().endsWith("/auth/refresh")) seen.refresh++; });
+  await page.evaluate(() => {
+    const s = JSON.parse(sessionStorage.getItem("sutradhar.session"));
+    const b64 = btoa(JSON.stringify({ exp: 1 })).replace(/=+$/, "");
+    s.access_token = `x.${b64}.y`;
+    sessionStorage.setItem("sutradhar.session", JSON.stringify(s));
+  });
+  await page.reload();
+  await page.locator(".lead").first().waitFor(T);
+  await page.getByRole("tab", { name: "Why" }).click(); await page.locator(".contrib").first().waitFor(T);
+  if (seen.demo !== 0) throw new Error(`became a new visitor ${seen.demo} time(s)`);
+  if (seen.refresh !== 1) throw new Error(`expected exactly one refresh, saw ${seen.refresh}`);
+});
+
 await check("hindi toggle", async () => {
   await go("/");
   await page.getByRole("button", { name: /हिं/ }).click();

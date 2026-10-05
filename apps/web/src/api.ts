@@ -25,6 +25,7 @@ async function ensureSession(): Promise<void> {
 async function raw(path: string, init: RequestInit = {}): Promise<Response> {
   await whenAwake();
   await ensureSession();
+  if (session && !path.startsWith("/api/v1/auth") && secondsLeft() < 90) await refresh().catch(() => false);
   const headers = new Headers(init.headers);
   if (session) headers.set("Authorization", `Bearer ${session.access_token}`);
   return fetch(`${BASE}${path}`, { ...init, headers });
@@ -44,7 +45,15 @@ export async function login(email: string, password: string): Promise<void> {
   save(await r.json());
 }
 
-async function refresh(): Promise<boolean> {
+let refreshing: Promise<boolean> | null = null;
+/** One refresh at a time: the server ends a session when a used refresh token is presented twice, so parallel
+ *  requests that all see an expired token must share a single refresh rather than each trying their own. */
+function refresh(): Promise<boolean> {
+  refreshing ??= doRefresh().finally(() => { refreshing = null; });
+  return refreshing;
+}
+
+async function doRefresh(): Promise<boolean> {
   if (!session) return false;
   const r = await fetch(`${BASE}/api/v1/auth/refresh`, {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -53,6 +62,14 @@ async function refresh(): Promise<boolean> {
   if (!r.ok) return false;
   save(await r.json());
   return true;
+}
+
+/** Seconds until the access token expires, read from its (unsigned-checked) payload; used only to renew early. */
+function secondsLeft(): number {
+  try {
+    const exp = JSON.parse(atob(session!.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).exp as number;
+    return exp - Date.now() / 1000;
+  } catch { return Infinity; }
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -75,7 +92,7 @@ export const publicGet = async <T,>(path: string): Promise<T> => {
 /** Fetch a file (an export, a sample pack) as bytes, signed in like every other call. */
 export async function apiBlob(path: string, init: RequestInit = {}): Promise<Blob> {
   let r = await raw(path, init);
-  if (r.status === 401 && session?.user.role === "demo" && (await enterDemo().then(() => true, () => false))) r = await raw(path, init);
+  if (r.status === 401 && (await refresh().catch(() => false) || (session?.user.role === "demo" && (await enterDemo().then(() => true, () => false))))) r = await raw(path, init);
   if (!r.ok) throw new Error(`download failed (${r.status})`);
   return r.blob();
 }
