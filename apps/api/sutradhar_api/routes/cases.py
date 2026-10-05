@@ -10,7 +10,7 @@ import csv
 import hashlib
 import io
 import json
-import zipfile
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -24,6 +24,7 @@ from sutradhar_api.auth.permissions import Action, allowed
 from sutradhar_api.auth.service import Principal
 from sutradhar_api.db import utcnow
 from sutradhar_api.deps import ReadDB, WriteDB, require
+from sutradhar_api.evidence import build_pack, verify_pack
 from sutradhar_api.models import Case, CaseItem, CaseNote, Export, Lead, Verification
 from sutradhar_api.pagination import Cursor, Limit, Page, decode_cursor, encode_cursor
 from sutradhar_api.problems import Problem
@@ -350,7 +351,6 @@ def _item_evidence(con, run, kind: str, ref: str, db) -> dict[str, Any]:  # type
 def _build_evidence_pack(
     request: Request, db, case: Case, items: list[CaseItem], principal: Principal
 ) -> bytes:  # type: ignore[no-untyped-def]
-    buf = io.BytesIO()
     manifest: dict[str, Any] = {
         "case_id": case.id,
         "title": case.title,
@@ -358,39 +358,36 @@ def _build_evidence_pack(
         "generated_by": principal.user.id,
         "items": [],
     }
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        by_run: dict[str, list[CaseItem]] = {}
-        for it in items:
-            by_run.setdefault(it.run_id, []).append(it)
-        for run_id, run_items in by_run.items():
-            run = visible_run(db, run_id, principal)
-            with run_store(request, run) as con:
-                for it in run_items:
-                    ev = _item_evidence(con, run, it.item_kind, it.ref, db)
-                    manifest["items"].append(
-                        {"item_id": it.id, "kind": it.item_kind, "ref": it.ref, "note": it.note}
-                    )
-                    zf.writestr(
-                        f"evidence/{it.id}_{it.item_kind}.json", json.dumps(ev, indent=2, default=str)
-                    )
-        notes = db.scalars(
-            select(CaseNote).where(CaseNote.case_id == case.id).order_by(CaseNote.created_at)
-        ).all()
-        zf.writestr(
-            "notes.md",
-            "\n\n---\n\n".join(
-                f"**{n.author_id}** ({n.created_at.isoformat()}):\n\n{n.body_md}" for n in notes
-            )
-            or "(no notes)",
-        )
-        zf.writestr("manifest.json", json.dumps(manifest, indent=2, sort_keys=True))
-        zf.writestr(
-            "README.txt",
-            f'Evidence pack for case {case.id} "{case.title}"\nGenerated {manifest["generated_at"]} by {principal.user.id}\n'
-            "This is synthetic-data evaluation output. Verify with POST /api/v1/verify.\n"
-            "All findings are leads for review, not statements about any person's identity or guilt.\n",
-        )
-    return buf.getvalue()
+    files: dict[str, bytes] = {}
+    by_run: dict[str, list[CaseItem]] = {}
+    for it in items:
+        by_run.setdefault(it.run_id, []).append(it)
+    for run_id, run_items in by_run.items():
+        run = visible_run(db, run_id, principal)
+        with run_store(request, run) as con:
+            for it in run_items:
+                ev = _item_evidence(con, run, it.item_kind, it.ref, db)
+                manifest["items"].append(
+                    {"item_id": it.id, "kind": it.item_kind, "ref": it.ref, "note": it.note}
+                )
+                files[f"evidence/{it.id}_{it.item_kind}.json"] = json.dumps(
+                    ev, indent=2, default=str
+                ).encode()
+    notes = db.scalars(
+        select(CaseNote).where(CaseNote.case_id == case.id).order_by(CaseNote.created_at)
+    ).all()
+    files["notes.md"] = (
+        "\n\n---\n\n".join(f"**{n.author_id}** ({n.created_at.isoformat()}):\n\n{n.body_md}" for n in notes)
+        or "(no notes)"
+    ).encode()
+    files["README.txt"] = (
+        f'Evidence pack for case {case.id} "{case.title}"\nGenerated {manifest["generated_at"]} by {principal.user.id}\n'
+        "Every file is hashed into manifest.json, and the manifest carries an HMAC seal from the issuing server.\n"
+        "Check it with the Verify page, or POST the zip to /api/v1/verify.\n"
+        "This is synthetic-data evaluation output. All findings are leads for review, not statements about any\n"
+        "person's identity or guilt.\n"
+    ).encode()
+    return build_pack(files, manifest, request.app.state.settings.signing_key)
 
 
 def _build_graphml(request: Request, db, case: Case, items: list[CaseItem], principal: Principal) -> bytes:  # type: ignore[no-untyped-def]
@@ -558,13 +555,20 @@ class VerifyOut(BaseModel):
     files_checked: int
     sha256_mismatches: list[str]
     manifest_present: bool
+    seal_valid: bool = False
+    missing_files: list[str] = []
+    unlisted_files: list[str] = []
+    reason: str = ""
+    case_id: str | None = None
+    title: str | None = None
+    generated_at: str | None = None
 
 
 @router.post("/verify")
-async def verify_pack(
+async def verify_pack_route(
     request: Request, principal: Annotated[Principal, require(Action.VERIFY)], db: WriteDB
 ) -> VerifyOut:
-    """Upload an evidence-pack zip; checks it is internally consistent (manifest present, file present)."""
+    """Upload an evidence-pack zip: every file is re-hashed against the manifest and the manifest seal is checked."""
     form = await request.form()
     upload = form.get("file")
     if upload is None or not hasattr(upload, "read"):
@@ -572,22 +576,8 @@ async def verify_pack(
     data = await upload.read()  # type: ignore[union-attr]
     if len(data) > 50 * 1024 * 1024:
         raise Problem(413, "too_large", "evidence packs are limited to 50 MB for verification")
-    ok, manifest_present, checked = True, False, 0
-    try:
-        with zipfile.ZipFile(io.BytesIO(data)) as zf:
-            names = zf.namelist()
-            manifest_present = "manifest.json" in names
-            checked = len(names)
-            if manifest_present:
-                json.loads(zf.read("manifest.json"))
-    except (zipfile.BadZipFile, json.JSONDecodeError):
-        ok = False
-    result = VerifyOut(
-        ok=ok and manifest_present,
-        files_checked=checked,
-        sha256_mismatches=[],
-        manifest_present=manifest_present,
-    )
+    verdict = verify_pack(data, request.app.state.settings.signing_key)
+    result = VerifyOut(**asdict(verdict))
     row = Verification(
         id=new_id("ev"),
         file_sha256=hashlib.sha256(data).hexdigest(),

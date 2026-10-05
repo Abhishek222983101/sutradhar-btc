@@ -57,7 +57,18 @@ def test_case_lifecycle_and_evidence_pack(client: TestClient, tiny_csv: bytes) -
     verify = client.post(
         "/api/v1/verify", headers=headers, files={"file": ("pack.zip", dl.content, "application/zip")}
     )
-    assert verify.json()["ok"] is True
+    assert verify.json()["ok"] is True and verify.json()["seal_valid"] is True
+    with zipfile.ZipFile(BytesIO(dl.content)) as zf:
+        files = {n: zf.read(n) for n in zf.namelist()}
+    files["notes.md"] = b"tampered after export"
+    forged = BytesIO()
+    with zipfile.ZipFile(forged, "w") as zf:
+        for name, content in files.items():
+            zf.writestr(name, content)
+    bad = client.post(
+        "/api/v1/verify", headers=headers, files={"file": ("pack.zip", forged.getvalue(), "application/zip")}
+    ).json()
+    assert bad["ok"] is False and bad["sha256_mismatches"] == ["notes.md"]
     assert (
         client.patch(f"/api/v1/cases/{case['id']}", headers=headers, params={"status": "closed"}).json()[
             "status"

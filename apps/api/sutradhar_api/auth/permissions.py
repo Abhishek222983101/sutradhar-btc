@@ -52,7 +52,9 @@ MATRIX: dict[Action, frozenset[Role]] = {
     Action.MODEL_PROMOTE: frozenset({M}),
     Action.ADMIN_MANAGE: frozenset({M}),
     Action.AUDIT_VIEW: frozenset({L, M, U}),
-    Action.AUDIT_VERIFY: frozenset({L, M, U}),
+    Action.AUDIT_VERIFY: frozenset(
+        {L, M, U, D}
+    ),  # demo visitors may check the chain is intact, never read entries
     Action.DEMO_RESET: frozenset({M}),
     Action.SESSION: frozenset({A, L, M, U, D}),
 }

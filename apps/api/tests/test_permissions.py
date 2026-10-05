@@ -75,6 +75,9 @@ def test_permission_matrix_matches_the_blueprint() -> None:
     assert Role.AUDITOR in MATRIX[Action.AUDIT_VERIFY]
     assert Role.AUDITOR not in MATRIX[Action.DATASET_UPLOAD]
     assert Role.DEMO not in MATRIX[Action.AUDIT_VIEW]
+    assert (
+        Role.DEMO in MATRIX[Action.AUDIT_VERIFY]
+    )  # the chain's integrity is public in the demo; its entries are not
     assert all(MATRIX[a] for a in Action)
 
 
