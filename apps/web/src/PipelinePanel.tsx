@@ -1,13 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, role, type RunInfo, type Suggestion } from "./api";
+import { STAGE_NAMES as NAMES } from "./stages";
 
 type Page<T> = { items: T[]; next_cursor: string | null };
-const NAMES: Record<string, string> = {
-  E01: "Load", E02: "GeoIP enrichment", E03: "Value flows", E04: "CoinJoin detection", E05: "Wallet clustering",
-  E06: "Change-address model", E07: "Peel chains", E08: "Anomaly model", E09: "Origin IP model", E11: "Co-origin linking",
-  E12: "Graph embeddings", E13: "Risk propagation", E14: "Behaviour fingerprints", E15: "Motifs", E16: "Merge suggestions",
-  E17: "Lead ranking", E18: "Explanations", E19: "Publish", E20: "Services and victims", E21: "Risk paths", E22: "Actor features",
-};
+
 const ROW_LABEL: Record<string, string> = { d_addr: "addresses", d_ip: "IPs", d_tx: "transactions", d_cluster: "wallet groups" };
 const label = (k: string) => ROW_LABEL[k] ?? k.replace(/^d_/, "").replace(/_/g, " ");
 const short = (c: string) => `${c.slice(0, 10)}…`;

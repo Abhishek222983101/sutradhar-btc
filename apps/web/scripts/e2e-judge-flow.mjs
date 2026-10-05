@@ -98,7 +98,7 @@ await check("filter: peel chain", async () => {
 await check("upload: sample CSV is ingested, analysed and shown", async () => {
   await go("/console"); await page.locator(".lead").first().waitFor(T);
   await page.locator('input[type="file"]').setInputFiles(new URL("../public/samples/sutradhar-sample.csv", import.meta.url).pathname);
-  await page.getByText(/Done: \d+ leads found/).waitFor({ timeout: 240_000 });
+  await page.getByText(/Done: \d+ leads found/).waitFor({ timeout: 420_000 });
   await page.locator(".lead").first().waitFor(T);
 });
 

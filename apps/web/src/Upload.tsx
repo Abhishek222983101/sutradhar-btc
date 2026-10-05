@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { api } from "./api";
+import { STAGE_NAMES } from "./stages";
 
-type Job = { status: string; error?: string; result?: unknown };
+type Job = { status: string; error?: string; result?: unknown; stage?: string | null };
 
-async function poll(id: string): Promise<Job> {
-  for (let i = 0; i < 240; i++) {
+async function poll(id: string, onTick?: (job: Job, seconds: number) => void): Promise<Job> {
+  const t0 = Date.now();
+  for (let i = 0; i < 900; i++) {
     const j = await api<Job>(`/api/v1/jobs/${id}`);
     if (["succeeded", "failed", "cancelled"].includes(j.status)) return j;
+    onTick?.(j, Math.round((Date.now() - t0) / 1000));
     await new Promise((r) => setTimeout(r, 750));
   }
   throw new Error("timed out waiting for the job");
@@ -27,9 +30,12 @@ export default function Upload({ onDone }: { onDone: (datasetId: string, runId: 
       const job = await poll(res.job.id);
       if (job.status !== "succeeded") throw new Error(job.error ?? "ingest failed");
       const r = job.result as { rows: number; transactions: number; rejects: number; observation_model: string };
-      setMsg(`Loaded ${r.rows} rows, ${r.transactions} transactions, ${r.rejects} rejected, observation model: ${r.observation_model}. Running the analysis…`);
+      setMsg(`Loaded ${r.rows} rows, ${r.transactions} transactions, ${r.rejects} rejected, observation model: ${r.observation_model}. Running the analysis (the free demo server is small: usually 1 to 2 minutes)…`);
       const run = await api<{ job: { id: string }; run: { id: string } }>("/api/v1/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataset_id: res.dataset.id }) });
-      const done = await poll(run.job.id);
+      const done = await poll(run.job.id, (j, sec) => {
+        const stage = j.stage ? `${j.stage} ${STAGE_NAMES[j.stage] ?? ""}`.trim() : "starting";
+        setMsg(`Running the analysis on the free demo server: ${sec}s so far (usually 1 to 2 minutes). Stage: ${stage}.`);
+      });
       if (done.status !== "succeeded") throw new Error(done.error ?? "analysis failed");
       setMsg(`Done: ${(done.result as { leads: number }).leads} leads found in your upload. The console now shows it. It is deleted after 60 minutes.`);
       onDone(res.dataset.id, run.run.id);

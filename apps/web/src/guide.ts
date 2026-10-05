@@ -154,7 +154,7 @@ export const STEPS: Step[] = [
     summary: "Ingestion in three formats, validated, with a plain-language report of what was accepted and refused.",
     do: [
       "Download a sample file from the links in the upload box (CSV, JSON or XML: same content, three formats).",
-      "Drop it on \"Try your own file\" and watch the status line: upload, read, normalise, analyse.",
+      "Drop it on \"Try your own file\" and watch the status line: upload, read, normalise, analyse. On the small free server the analysis takes 1 to 2 minutes and the line shows each stage as it runs.",
       "When it finishes, the whole console switches to your upload. Open the Dataset X-ray at the bottom.",
     ],
     inputs: [
