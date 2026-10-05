@@ -17,7 +17,15 @@
 
 </div>
 
-<!-- DEMO VIDEO: paste the link here once recorded, e.g. "▶ Watch the 5-minute demo: <link>" -->
+<div align="center">
+
+## ▶️ [Watch the demo video on YouTube](https://youtu.be/5qLpwDIZ7bU)
+
+[![Watch the Sutradhar demo](https://img.youtube.com/vi/5qLpwDIZ7bU/maxresdefault.jpg)](https://youtu.be/5qLpwDIZ7bU)
+
+**The whole project in under 5 minutes, then try it yourself on the [live site](https://sutradhar-one-red.vercel.app).**
+
+</div>
 
 ---
 
@@ -25,11 +33,12 @@
 
 | | |
 |---|---|
+| **0. Watch** | The [**demo video**](https://youtu.be/5qLpwDIZ7bU) (under 5 minutes). |
 | **1. Open** | **https://sutradhar-one-red.vercel.app** and press **Start the 8-minute tour**. |
 | **2. Follow** | The **Judge guide** (`#/guide`) lists every check in order: the exact text to paste, what you should see, and which requirement it proves. A small tour card follows you through the site. |
 | **3. Compare** | Each of the 20 problem-statement requirements is linked from the landing page to a live page that proves it. |
 | **Server asleep?** | The demo API is on a free host that sleeps when idle. It is pinged every 4 minutes by a keep-alive workflow, and if it is ever asleep a clearly labelled saved copy of the demo data shows instantly while it wakes (about 45 s). Upload, Cases and Verify need the live server. |
-| **Prefer a recording?** | The script behind the video is [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). |
+| **Video script** | The script behind the video is [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). |
 
 <div align="center"><img src="docs/screenshots/02-judge-guide.jpg" alt="The Judge guide" width="80%"></div>
 
