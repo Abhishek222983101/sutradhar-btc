@@ -28,7 +28,7 @@ export function StatusPill() {
 
 export function WakeBanner() {
   const w = useWake();
-  if (w.state === "ready" || w.state === "checking") return null;
+  if (w.state === "ready" || (w.state === "checking" && !w.snapshot)) return null;
   const down = w.state === "down";
   return (
     <div className={`wake${down ? " down" : ""}`} role="status" aria-live="polite">
@@ -40,8 +40,12 @@ export function WakeBanner() {
           </>
         ) : (
           <>
-            <b>Waking the demo server… {w.elapsed}s</b>
-            <p className="note">It runs on a free host that sleeps when idle and needs 30–45 seconds to start. Nothing is broken: this page continues on its own.</p>
+            <b>{w.snapshot ? "Showing a saved copy of the demo data while the live server wakes" : "Waking the demo server"}… {w.elapsed}s</b>
+            <p className="note">
+              {w.snapshot
+                ? "The server runs on a free host that sleeps when idle and needs 30–45 seconds to start. Everything you can read is the same data; uploads, cases and Verify need the live server and continue as soon as it is ready. This page then refreshes by itself."
+                : "It runs on a free host that sleeps when idle and needs 30–45 seconds to start. Nothing is broken: this page continues on its own."}
+            </p>
             <div className="meter" aria-hidden="true"><i /></div>
           </>
         )}

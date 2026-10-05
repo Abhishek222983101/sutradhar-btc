@@ -1,4 +1,5 @@
-import { whenAwake } from "./wake";
+import { isReady, markSnapshot, whenAwake } from "./wake";
+import { snapshotGet } from "./snapshot";
 
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const KEY = "sutradhar.session";
@@ -72,7 +73,21 @@ function secondsLeft(): number {
   } catch { return Infinity; }
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** While the free host wakes, answer reads from the saved snapshot after a short grace period. */
+async function fromSnapshot(path: string, init: RequestInit): Promise<unknown | undefined> {
+  if ((init.method ?? "GET").toUpperCase() !== "GET" || isReady()) return undefined;
+  await Promise.race([whenAwake().catch(() => undefined), sleep(1200)]);
+  if (isReady()) return undefined;
+  const hit = await snapshotGet(path);
+  if (hit !== undefined) markSnapshot();
+  return hit;
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const saved = await fromSnapshot(path, init);
+  if (saved !== undefined) return saved as T;
   let r = await raw(path, init);
   if (r.status === 401 && (await refresh().catch(() => false) || (session?.user.role === "demo" && (await enterDemo().then(() => true, () => false))))) r = await raw(path, init);
   if (!r.ok) {
@@ -83,6 +98,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const publicGet = async <T,>(path: string): Promise<T> => {
+  const saved = await fromSnapshot(path, {});
+  if (saved !== undefined) return saved as T;
   await whenAwake();
   const r = await fetch(`${BASE}${path}`);
   if (!r.ok) throw new Error(String(r.status));

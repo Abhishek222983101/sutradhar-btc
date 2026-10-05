@@ -6,21 +6,28 @@ import { useSyncExternalStore } from "react";
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 export type WakeState = "checking" | "waking" | "ready" | "down";
-export type Wake = { state: WakeState; elapsed: number };
+export type Wake = { state: WakeState; elapsed: number; snapshot: boolean; epoch: number };
 
 const SLOW_AFTER_MS = 2500;
 const GIVE_UP_MS = 150_000;
 const HEARTBEAT_MS = 4 * 60_000;
 
-let snap: Wake = { state: "checking", elapsed: 0 };
+let snap: Wake = { state: "checking", elapsed: 0, snapshot: false, epoch: 0 };
 const subs = new Set<() => void>();
 let running: Promise<void> | null = null;
 let heartbeat: number | undefined;
 
-const set = (next: Wake) => {
+const set = (patch: Partial<Wake>) => {
+  const next = { ...snap, ...patch };
+  // Coming alive after serving the saved snapshot: bump the epoch so pages reload with live data.
+  if (patch.state === "ready" && snap.state !== "ready" && snap.snapshot) { next.epoch = snap.epoch + 1; next.snapshot = false; }
   snap = next;
   subs.forEach((f) => f());
 };
+
+/** A page was just served from the saved snapshot while the live server is not ready. */
+export function markSnapshot() { if (!snap.snapshot) set({ snapshot: true }); }
+export const isReady = () => snap.state === "ready";
 
 async function ping(timeoutMs: number): Promise<boolean> {
   try {
