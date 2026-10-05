@@ -26,6 +26,7 @@ from sutradhar_api.jobs.queue import enqueue, find_idempotent
 from sutradhar_api.models import Dataset, DatasetFile, Job
 from sutradhar_api.pagination import Cursor, Limit, Page, cursor_time, decode_cursor, encode_cursor
 from sutradhar_api.problems import Problem
+from sutradhar_api.routes.common import store_lock
 from sutradhar_api.schemas import DatasetAccepted, DatasetDetail, DatasetFileOut, DatasetOut, JobOut
 from sutradhar_schemas.ids import new_id
 
@@ -305,14 +306,15 @@ def dataset_rejects(
         return Page[dict](items=[], next_cursor=None)
     after = decode_cursor(cursor, (int,))
     offset = after[0] if after else 0
-    con = duckdb.connect(str(path), read_only=True)
-    try:
-        if rule:
-            rows = con.execute(REJECTS_BY_RULE_SQL, [rule, limit + 1, offset]).fetchall()
-        else:
-            rows = con.execute(REJECTS_SQL, [limit + 1, offset]).fetchall()
-    finally:
-        con.close()
+    with store_lock(dataset_id):
+        con = duckdb.connect(str(path), read_only=True)
+        try:
+            if rule:
+                rows = con.execute(REJECTS_BY_RULE_SQL, [rule, limit + 1, offset]).fetchall()
+            else:
+                rows = con.execute(REJECTS_SQL, [limit + 1, offset]).fetchall()
+        finally:
+            con.close()
     more, rows = len(rows) > limit, rows[:limit]
     items = [
         dict(zip(("file_id", "row_no", "rule", "field", "value", "message"), r, strict=True)) for r in rows

@@ -18,6 +18,7 @@ from sutradhar_api.jobs.queue import enqueue, find_idempotent
 from sutradhar_api.models import Dataset, Job, Lead, LeadState, MergeDecision, Run
 from sutradhar_api.pagination import Cursor, Limit, Page, cursor_time, decode_cursor, encode_cursor
 from sutradhar_api.problems import Problem
+from sutradhar_api.routes.common import run_store, store_lock
 from sutradhar_api.routes.datasets import DEMO_MAX_ACTIVE_JOBS
 from sutradhar_api.routes.watchlists import snapshot_for_run
 from sutradhar_api.schemas import (
@@ -225,18 +226,8 @@ def hero_eval() -> dict[str, Any]:
 
 
 def _open_run(request: Request, run: Run):  # type: ignore[no-untyped-def]
-    """The run store read-only with the dataset attached as `ds`; the caller closes it."""
-    import duckdb
-
-    root = request.app.state.settings.data_dir
-    path = root / "runs" / run.id / "run.duckdb"
-    if not path.exists():
-        raise Problem(404, "not_found", "this run's data is no longer available")
-    con = duckdb.connect(str(path), read_only=True)
-    con.execute(
-        f"ATTACH '{(root / 'datasets' / run.dataset_id / 'dataset.duckdb').as_posix()}' AS ds (READ_ONLY)"
-    )
-    return con
+    """The run store read-only with the dataset attached as `ds`, as a context manager (see `run_store`)."""
+    return run_store(request, run)
 
 
 def _lead_and_run(db: Session, lead_id: str, principal: Principal) -> tuple[Lead, Run]:
@@ -288,11 +279,8 @@ def lead_subgraph(
     cluster = _lead_cluster(lead)
     if cluster is None:
         return {"nodes": [], "edges": [], "truncated": False}
-    con = _open_run(request, run)
-    try:
+    with _open_run(request, run) as con:
         return build(con, cluster)
-    finally:
-        con.close()
 
 
 @router.get("/leads/{lead_id}/evidence")
@@ -304,8 +292,7 @@ def lead_evidence(
     cluster = _lead_cluster(lead)
     if cluster is None:
         raise Problem(404, "not_found", "this kind of lead has no transaction evidence")
-    con = _open_run(request, run)
-    try:
+    with _open_run(request, run) as con:
         ips = con.execute(
             "SELECT ip, n_tx FROM actor_ip WHERE cluster_id = ? ORDER BY n_tx DESC, ip", [cluster]
         ).fetchall()
@@ -343,8 +330,6 @@ def lead_evidence(
                 "SELECT address FROM cluster WHERE cluster_id = ? ORDER BY 1 LIMIT 30", [cluster]
             ).fetchall()
         ]
-    finally:
-        con.close()
     return {
         "ip": ip,
         "ips": [{"ip": i, "n_tx": int(n)} for i, n in ips],
@@ -404,9 +389,6 @@ def merge_suggestions(
     cursor: Cursor = None,
 ) -> Page[dict[str, Any]]:
     """Wallet-cluster pairs that may belong to one operator (for an analyst to accept or reject), with reasons."""
-    import json
-
-    import duckdb
 
     run = _visible_run(db, run_id, principal)
     path = request.app.state.settings.data_dir / "runs" / run.id / "run.duckdb"
@@ -414,6 +396,15 @@ def merge_suggestions(
         return Page[dict[str, Any]](items=[], next_cursor=None)
     after = decode_cursor(cursor, (int,))
     offset = after[0] if after else 0
+    with store_lock(run.dataset_id):
+        return _merge_page(path, limit, offset)
+
+
+def _merge_page(path, limit: int, offset: int) -> Page[dict[str, Any]]:  # type: ignore[no-untyped-def]
+    import json
+
+    import duckdb
+
     con = duckdb.connect(str(path), read_only=True)
     try:
         have = {r[0] for r in con.execute("SELECT table_name FROM information_schema.tables").fetchall()}
