@@ -332,3 +332,32 @@ def ip_page(
         "wallet_groups": clusters,
         "leads": [{"id": lead.id, "title": lead.title, "p": lead.p, "grade": lead.grade} for lead in leads],
     }
+
+
+@router.get("/asn/{asn}")
+def asn_page(
+    run_id: str, asn: int, request: Request, principal: Annotated[Principal, require(Action.VIEW)], db: ReadDB
+) -> dict[str, Any]:
+    """Every IP in the run that belongs to one autonomous system, with how many transactions each announced."""
+    if not 0 < asn < 2**32:
+        raise Problem(422, "validation", "that is not an AS number")
+    run = visible_run(db, run_id, principal)
+    with run_store(request, run) as con:
+        if not has_table(con, "ip_geo"):
+            raise Problem(404, "not_found", "this run has no GeoIP enrichment")
+        ips = rows(
+            con,
+            "SELECT g.ip, g.country, g.org, count(DISTINCT o.txid) AS n_tx FROM ip_geo g"
+            " LEFT JOIN ds.obs o ON o.src_ip = g.ip WHERE g.asn = ? GROUP BY g.ip, g.country, g.org"
+            " ORDER BY n_tx DESC, g.ip LIMIT 100",
+            [asn],
+        )
+    if not ips:
+        raise Problem(404, "not_found", "no IP in this run belongs to that AS")
+    return {
+        "asn": asn,
+        "org": next((r["org"] for r in ips if r["org"]), None),
+        "ips": ips,
+        "source": SOURCE,
+        "as_of": AS_OF,
+    }
