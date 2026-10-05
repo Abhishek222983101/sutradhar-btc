@@ -391,7 +391,7 @@ def _build_evidence_pack(
 
 
 def _build_graphml(request: Request, db, case: Case, items: list[CaseItem], principal: Principal) -> bytes:  # type: ignore[no-untyped-def]
-    import xml.etree.ElementTree as ET
+    import xml.etree.ElementTree as ET  # nosec B405 - only builds GraphML for export; never parses input
 
     root = ET.Element("graphml", {"xmlns": "http://graphml.graphdrawing.org/xmlns"})
     graph = ET.SubElement(root, "graph", {"id": case.id, "edgedefault": "directed"})

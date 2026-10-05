@@ -8,7 +8,7 @@ from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape  # nosec B406 - escapes text for XML we write; nothing is parsed
 
 import polars as pl
 

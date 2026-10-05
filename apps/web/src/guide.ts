@@ -226,7 +226,7 @@ export const STEPS: Step[] = [
   {
     id: "tech", title: "Understand the engineering",
     where: { page: "how" },
-    summary: "Architecture, the 22-stage pipeline, every model and how explanations are produced.",
+    summary: "Architecture, the 21-stage pipeline, every model and how explanations are produced.",
     do: ["Read top to bottom, or jump to a section from the contents list."],
     expect: ["An architecture diagram, a stage table, live model metrics and the evaluation numbers."],
     proves: ["R-07", "R-19"],
