@@ -21,7 +21,7 @@
 
 ## ▶️ [Watch the demo video on YouTube](https://youtu.be/5qLpwDIZ7bU)
 
-[![Watch the Sutradhar demo](https://img.youtube.com/vi/5qLpwDIZ7bU/maxresdefault.jpg)](https://youtu.be/5qLpwDIZ7bU)
+[![Watch the Sutradhar demo](docs/screenshots/01-landing.jpg)](https://youtu.be/5qLpwDIZ7bU)
 
 **The whole project in under 5 minutes, then try it yourself on the [live site](https://sutradhar-one-red.vercel.app).**
 
